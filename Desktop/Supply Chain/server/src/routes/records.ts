@@ -252,7 +252,14 @@ router.put('/:id', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS', 'A
 
   const b = req.body ?? {};
 
-  if (req.user!.role !== 'DRIVER' && (!b.remarks || !String(b.remarks).trim())) {
+  const LOGISTICS_SUBSTANTIVE_FIELDS = ['driver', 'vehicle', 'driver_assistants', 'time_in', 'time_out', 'received_by', 'linked_collection_id'];
+  const SC_SUBSTANTIVE_FIELDS = ['company_id', 'priority', 'reference', 'area', 'account_manager', 'delivery_date', 'item_type', 'is_draft', 'date_time', 'item_description', 'attachments', 'amount'];
+  const substantiveFields = (req.user!.role === 'LOGISTICS' || req.user!.role === 'ADMIN')
+    ? LOGISTICS_SUBSTANTIVE_FIELDS
+    : SC_SUBSTANTIVE_FIELDS;
+  const hasSubstantiveChange = substantiveFields.some(f => f in b);
+
+  if (req.user!.role !== 'DRIVER' && hasSubstantiveChange && (!b.remarks || !String(b.remarks).trim())) {
     return res.status(400).json({ error: 'Remarks are required when editing a record.' });
   }
 
