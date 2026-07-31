@@ -261,15 +261,16 @@ export default function DeliveryRecordsView({
     : baseFiltered;
 
   const now = Date.now();
-  const sortedFiltered = dateSort === 'default' ? filtered : [...filtered].sort((a, b) => {
+  const activeDateSort = (dateFrom || dateTo) ? 'default' : dateSort;
+  const sortedFiltered = activeDateSort === 'default' ? filtered : [...filtered].sort((a, b) => {
     const da = a.delivery_date ? new Date(a.delivery_date + 'T12:00:00').getTime() : null;
     const db = b.delivery_date ? new Date(b.delivery_date + 'T12:00:00').getTime() : null;
     if (!da && !db) return 0;
     if (!da) return 1;
     if (!db) return -1;
-    if (dateSort === 'nearest')  return Math.abs(da - now) - Math.abs(db - now);
-    if (dateSort === 'oldest')   return da - db;
-    if (dateSort === 'furthest') return db - da;
+    if (activeDateSort === 'nearest')  return Math.abs(da - now) - Math.abs(db - now);
+    if (activeDateSort === 'oldest')   return da - db;
+    if (activeDateSort === 'furthest') return db - da;
     return 0;
   });
 
@@ -346,7 +347,7 @@ export default function DeliveryRecordsView({
 
   const exportSummary = computeAllOpsSummary(
     sortedFiltered,
-    dateSort === 'default' ? 'nearest' : dateSort
+    activeDateSort === 'default' ? 'nearest' : activeDateSort
   );
 
   const routeSlipProps = driverFilter
@@ -764,8 +765,11 @@ export default function DeliveryRecordsView({
                     <select
                       value={dateSort}
                       onChange={e => setDateSort(e.target.value as typeof dateSort)}
-                      className="text-[11px] font-semibold border border-slate-200 bg-white text-slate-700 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0078C1] cursor-pointer"
+                      disabled={!!(dateFrom || dateTo)}
+                      title={(dateFrom || dateTo) ? 'Sort order is N/A while a date range filter is active' : undefined}
+                      className={`text-[11px] font-semibold border rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0078C1] ${(dateFrom || dateTo) ? 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed' : 'border-slate-200 bg-white text-slate-700 cursor-pointer'}`}
                     >
+                      {(dateFrom || dateTo) && <option value={dateSort}>Sort: N/A</option>}
                       <option value="default">Date: Default</option>
                       <option value="nearest">Nearest to Present</option>
                       <option value="oldest">Oldest First</option>
