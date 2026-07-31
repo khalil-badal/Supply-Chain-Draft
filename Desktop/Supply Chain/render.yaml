@@ -1,0 +1,40 @@
+databases:
+  - name: mg-portal-db
+    databaseName: mg_portal
+    user: mg_portal_user
+    plan: free
+
+services:
+  - type: web
+    name: mg-portal
+    env: node
+    plan: free
+    # Build: install both frontend and backend deps, build Vite frontend,
+    # then build the Express backend TypeScript, then generate Prisma client.
+    buildCommand: >
+      npm install --include=dev &&
+      npm run build &&
+      cd server &&
+      npm install --include=dev &&
+      npx prisma generate &&
+      npm run build
+    # Start: run DB migrations (safe to run on every deploy),
+    # seed if the DB is empty (idempotent), then start Express which
+    # serves both the API and the built Vite frontend.
+    startCommand: >
+      cd server &&
+      npx prisma migrate deploy &&
+      npx tsx prisma/seed.ts &&
+      cd .. &&
+      node server/dist/src/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mg-portal-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PORT
+        value: 10000

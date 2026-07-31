@@ -1,0 +1,6 @@
+{
+  "name": "Microgenesis Supply Chain Portal",
+  "description": "An internal supply chain system prototype for Microgenesis Business Systems, managing POS inventory, procurement approval chains, order fulfillment, and deliveries.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
