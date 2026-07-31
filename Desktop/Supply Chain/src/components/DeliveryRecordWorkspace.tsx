@@ -10,7 +10,8 @@ import {
 import { DeliveryRecord, DeliveryCategory, UserRole, DeliveryStatus, OutputActionConfig, OutputActionTrigger } from '../types';
 import { api, ApiAuditEntry, ApiComment, ApiCompany, ApiRemarkLog } from '../api';
 import { printSingleManifest, ManifestDocumentationData } from './DeliveryManifest';
-import { DRIVERS, DRIVER_ASSISTANTS, DELIVERY_STATUSES, AREA_HIERARCHY, VEHICLES, PRIORITIES, ITEM_TYPES, ACCOUNT_MANAGERS, DRIVER_COVERAGE_AREAS, getSubregion, getNearbyAreas } from '../data';
+import { DRIVERS, DRIVER_ASSISTANTS, DELIVERY_STATUSES, AREAS, AREA_HIERARCHY, VEHICLES, PRIORITIES, ITEM_TYPES, ACCOUNT_MANAGERS, DRIVER_COVERAGE_AREAS, getSubregion, getNearbyAreas } from '../data';
+import ComboboxField from './ComboboxField';
 import { Pencil, X as XIcon, Save } from 'lucide-react';
 import { getOutputTrigger, runOutputActions } from '../outputActions';
 import StatusStepper from './StatusStepper';
@@ -106,6 +107,7 @@ type EditDraft = {
   priority: string; reference: string; area: string; vehicle: string;
   account_manager: string; delivery_date: string; date_time: string;
   item_type: string; is_draft: string; remarks: string; item_description: string;
+  address: string;
 };
 
 function GeneralTab({
@@ -121,8 +123,10 @@ function GeneralTab({
 }) {
   const CategoryIcon = CATEGORY_ICON[record.category] ?? FileText;
 
-  // SC can edit only while the record is still Scheduled (not yet touched by Logistics)
-  const canEdit = currentUserRole === 'Sales Coordinator' && record.status === 'Scheduled';
+  // SC can edit all fields while the record is still Scheduled; Logistics can always edit Area + Address
+  const canEditFull = currentUserRole === 'Sales Coordinator' && record.status === 'Scheduled';
+  const canEditAreaAddress = currentUserRole === 'Logistics';
+  const canEdit = canEditFull || canEditAreaAddress;
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -139,6 +143,7 @@ function GeneralTab({
     is_draft: record.is_draft,
     remarks: record.remarks || '',
     item_description: record.item_description || '',
+    address: record.address ?? '',
   });
 
   // Re-sync draft when a different record is opened
@@ -156,10 +161,19 @@ function GeneralTab({
       is_draft: record.is_draft,
       remarks: record.remarks || '',
       item_description: record.item_description || '',
+      address: record.address ?? '',
     });
   }, [record.id]);
 
   const set = (k: keyof EditDraft, v: string) => setDraft(p => ({ ...p, [k]: v }));
+
+  const handleStartEdit = () => {
+    // Logistics enters a fresh change note rather than seeing/overwriting existing remarks
+    if (canEditAreaAddress && !canEditFull) {
+      setDraft(d => ({ ...d, remarks: '' }));
+    }
+    setEditing(true);
+  };
 
   const handleSave = async () => {
     if (!draft.remarks.trim()) {
@@ -168,8 +182,11 @@ function GeneralTab({
     }
     setRemarksError(false);
     setSaving(true);
+    const updates = canEditFull
+      ? { ...draft }
+      : { area: draft.area, address: draft.address, remarks: draft.remarks };
     await onUpdateRecord(record.id, {
-      ...draft,
+      ...updates,
       modified_by: `${currentUserName} (${currentUserRole})`,
       modified_at: new Date().toISOString(),
     });
@@ -190,6 +207,7 @@ function GeneralTab({
       is_draft: record.is_draft,
       remarks: record.remarks || '',
       item_description: record.item_description || '',
+      address: record.address ?? '',
     });
     setRemarksError(false);
     setEditing(false);
@@ -231,10 +249,10 @@ function GeneralTab({
           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Record Details</h4>
           {canEdit && !editing && (
             <button
-              onClick={() => setEditing(true)}
+              onClick={handleStartEdit}
               className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-[#0078C1] hover:bg-blue-50 border border-blue-200 rounded-lg transition-colors cursor-pointer"
             >
-              <Pencil className="w-3 h-3" /> Edit
+              <Pencil className="w-3 h-3" /> {canEditAreaAddress && !canEditFull ? 'Edit Area / Address' : 'Edit'}
             </button>
           )}
           {editing && (
@@ -264,6 +282,7 @@ function GeneralTab({
               {[
                 { label: 'Reference (SAP)', value: record.reference },
                 { label: 'Area',            value: record.area },
+                { label: 'Address',         value: record.address || '—' },
                 { label: 'Vehicle',         value: record.vehicle || '—' },
                 { label: 'Driver',            value: record.driver || 'Unassigned' },
                 { label: 'Driver Assistants', value: (record.driver_assistants ?? []).join(', ') || '—' },
@@ -298,78 +317,95 @@ function GeneralTab({
         ) : (
           <div className="space-y-4 text-xs">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {canEditFull && (
+                <>
+                  <div className="space-y-1">
+                    <label className={labelCls}>Priority</label>
+                    <select value={draft.priority} onChange={e => set('priority', e.target.value)} className={inputCls}>
+                      {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelCls}>Reference (SAP)</label>
+                    <input type="text" value={draft.reference} onChange={e => set('reference', e.target.value)} className={inputCls} />
+                  </div>
+                </>
+              )}
               <div className="space-y-1">
-                <label className={labelCls}>Priority</label>
-                <select value={draft.priority} onChange={e => set('priority', e.target.value)} className={inputCls}>
-                  {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className={labelCls}>Reference (SAP)</label>
-                <input type="text" value={draft.reference} onChange={e => set('reference', e.target.value)} className={inputCls} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelCls}>Area</label>
-                <select value={draft.area} onChange={e => set('area', e.target.value)} className={inputCls}>
-                  <option value="">— Select —</option>
-                  {AREA_HIERARCHY.flatMap(r =>
-                    r.subregions.map(s => (
-                      <optgroup key={s.name} label={`${r.region} · ${s.name}`}>
-                        {s.areas.map(a => <option key={a} value={a}>{a}</option>)}
-                      </optgroup>
-                    ))
+                <ComboboxField
+                  label="Area"
+                  optional
+                  options={AREAS}
+                  optionGroups={AREA_HIERARCHY.flatMap(r =>
+                    r.subregions.map(s => ({ label: `${r.region} · ${s.name}`, options: s.areas }))
                   )}
-                </select>
+                  value={draft.area}
+                  onChange={v => set('area', v)}
+                  placeholder="Type to search or scroll to browse..."
+                />
               </div>
               <div className="space-y-1">
-                <label className={labelCls}>Vehicle</label>
-                <select value={draft.vehicle} onChange={e => set('vehicle', e.target.value)} className={inputCls}>
-                  {VEHICLES.map(v => <option key={v} value={v}>{v}</option>)}
-                </select>
+                <label className={labelCls}>Address <span className="text-[10px] font-normal text-slate-400 normal-case tracking-normal">(optional)</span></label>
+                <input type="text" value={draft.address} onChange={e => set('address', e.target.value)} className={inputCls} placeholder="Street, building, floor, or additional location detail" />
               </div>
-              <div className="space-y-1">
-                <label className={labelCls}>Account Manager</label>
-                <select value={draft.account_manager} onChange={e => set('account_manager', e.target.value)} className={inputCls}>
-                  <option value="">— Select —</option>
-                  {ACCOUNT_MANAGERS.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className={labelCls}>Item Type</label>
-                <select value={draft.item_type} onChange={e => set('item_type', e.target.value)} className={inputCls}>
-                  {ITEM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className={labelCls}>Delivery Date</label>
-                <input type="date" value={draft.delivery_date} onChange={e => set('delivery_date', e.target.value)} className={inputCls} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelCls}>Date &amp; Time</label>
-                <input type="datetime-local" value={draft.date_time} onChange={e => set('date_time', e.target.value)} className={inputCls} />
-              </div>
-              <div className="space-y-1">
-                <label className={labelCls}>Draft</label>
-                <select value={draft.is_draft} onChange={e => set('is_draft', e.target.value)} className={inputCls}>
-                  <option value="No">No</option>
-                  <option value="Yes">Yes</option>
-                </select>
-              </div>
+              {canEditFull && (
+                <>
+                  <div className="space-y-1">
+                    <label className={labelCls}>Vehicle</label>
+                    <select value={draft.vehicle} onChange={e => set('vehicle', e.target.value)} className={inputCls}>
+                      {VEHICLES.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelCls}>Account Manager</label>
+                    <select value={draft.account_manager} onChange={e => set('account_manager', e.target.value)} className={inputCls}>
+                      <option value="">— Select —</option>
+                      {ACCOUNT_MANAGERS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelCls}>Item Type</label>
+                    <select value={draft.item_type} onChange={e => set('item_type', e.target.value)} className={inputCls}>
+                      {ITEM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelCls}>Delivery Date</label>
+                    <input type="date" value={draft.delivery_date} onChange={e => set('delivery_date', e.target.value)} className={inputCls} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelCls}>Date &amp; Time</label>
+                    <input type="datetime-local" value={draft.date_time} onChange={e => set('date_time', e.target.value)} className={inputCls} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelCls}>Draft</label>
+                    <select value={draft.is_draft} onChange={e => set('is_draft', e.target.value)} className={inputCls}>
+                      <option value="No">No</option>
+                      <option value="Yes">Yes</option>
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
             <div className="space-y-1">
-              <label className={labelCls}>Remarks <span className="text-red-500">*</span></label>
+              <label className={labelCls}>
+                {canEditFull ? 'Remarks' : 'Change Note'} <span className="text-red-500">*</span>
+              </label>
               <textarea
                 value={draft.remarks}
                 onChange={e => { set('remarks', e.target.value); if (remarksError && e.target.value.trim()) setRemarksError(false); }}
                 rows={3}
+                placeholder={canEditFull ? '' : 'Explain why you are updating the area or address…'}
                 className={`w-full px-2.5 py-1.5 border rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#0078C1]/30 focus:border-[#0078C1] ${remarksError ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
               />
               {remarksError && <p className="text-[11px] text-red-600 font-semibold">Remarks are required to save changes.</p>}
             </div>
-            <div className="space-y-1">
-              <label className={labelCls}>Item Description</label>
-              <textarea value={draft.item_description} onChange={e => set('item_description', e.target.value)} rows={3} className={inputCls} />
-            </div>
+            {canEditFull && (
+              <div className="space-y-1">
+                <label className={labelCls}>Item Description</label>
+                <textarea value={draft.item_description} onChange={e => set('item_description', e.target.value)} rows={3} className={inputCls} />
+              </div>
+            )}
 
             {/* Always-locked fields */}
             <div className="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">

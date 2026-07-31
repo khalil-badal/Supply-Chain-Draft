@@ -209,6 +209,7 @@ router.post('/', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS'), asy
       draft: b.is_draft === 'Yes',
       dateAndTime: b.date_time ?? new Date().toISOString(),
       itemDescription: b.item_description ?? '',
+      address: b.address ?? '',
       documentAttachment: Array.isArray(b.attachments) && b.attachments.length > 0 ? b.attachments[0] : null,
       amount: b.amount != null ? parseFloat(String(b.amount)) : null,
       createdById: req.user!.id,
@@ -252,8 +253,8 @@ router.put('/:id', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS', 'A
 
   const b = req.body ?? {};
 
-  const LOGISTICS_SUBSTANTIVE_FIELDS = ['driver', 'vehicle', 'driver_assistants', 'time_in', 'time_out', 'received_by', 'linked_collection_id'];
-  const SC_SUBSTANTIVE_FIELDS = ['company_id', 'priority', 'reference', 'area', 'account_manager', 'delivery_date', 'item_type', 'is_draft', 'date_time', 'item_description', 'attachments', 'amount'];
+  const LOGISTICS_SUBSTANTIVE_FIELDS = ['driver', 'vehicle', 'driver_assistants', 'time_in', 'time_out', 'received_by', 'linked_collection_id', 'area', 'address'];
+  const SC_SUBSTANTIVE_FIELDS = ['company_id', 'priority', 'reference', 'area', 'address', 'account_manager', 'delivery_date', 'item_type', 'is_draft', 'date_time', 'item_description', 'attachments', 'amount'];
   const substantiveFields = (req.user!.role === 'LOGISTICS' || req.user!.role === 'ADMIN')
     ? LOGISTICS_SUBSTANTIVE_FIELDS
     : SC_SUBSTANTIVE_FIELDS;
@@ -279,6 +280,8 @@ router.put('/:id', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS', 'A
     if (b.time_in !== undefined) data.timeIn = b.time_in ?? null;
     if (b.time_out !== undefined) data.timeOut = b.time_out ?? null;
     if (b.received_by !== undefined) data.receivedBy = b.received_by ?? null;
+    if (b.area !== undefined) data.area = b.area;
+    if (b.address !== undefined) data.address = b.address;
     if (b.remarks !== undefined) data.remarks = b.remarks;
 
     // Link to an Accounting Collection record (or clear the link)
@@ -310,6 +313,7 @@ router.put('/:id', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS', 'A
     if (b.item_description !== undefined) data.itemDescription = b.item_description;
     if (Array.isArray(b.attachments) && b.attachments.length > 0) data.documentAttachment = b.attachments[0];
     if (b.amount !== undefined) data.amount = b.amount != null ? parseFloat(String(b.amount)) : null;
+    if (b.address !== undefined) data.address = b.address;
   }
 
   const updated = await prisma.deliveryRecord.update({

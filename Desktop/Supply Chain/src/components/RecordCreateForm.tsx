@@ -106,6 +106,7 @@ interface RecordFormState {
   is_draft: string;
   date_time: string;
   item_description: string;
+  address: string;
   attachments: string[];
 }
 
@@ -118,6 +119,7 @@ const buildEmptyForm = (category: DeliveryCategory): RecordFormState => ({
   status: 'Scheduled',
   vehicle: '(None)',
   area: '',
+  address: '',
   account_manager: '',
   delivery_date: '',
   category,
@@ -360,6 +362,18 @@ export default function RecordCreateForm({
             onChange={v => updateField('area', v)}
             placeholder="Type to search or scroll to browse..."
           />
+
+          {/* Address */}
+          <div className="space-y-1.5 md:col-span-2">
+            <label className="font-bold text-slate-700">Address <span className="text-[10px] font-normal text-slate-400">(optional)</span></label>
+            <input
+              type="text"
+              value={form.address}
+              onChange={e => updateField('address', e.target.value)}
+              placeholder="Street, building, floor, or additional location detail (optional)"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0078C1]/30 focus:border-[#0078C1]"
+            />
+          </div>
 
           {/* Account Manager */}
           <ComboboxField

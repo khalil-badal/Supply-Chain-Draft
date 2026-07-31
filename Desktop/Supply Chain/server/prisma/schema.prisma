@@ -114,6 +114,7 @@ model DeliveryRecord {
   dateAndTime        String
   itemDescription    String  @default("")
   documentAttachment String?
+  address            String  @default("")
 
   collectionVerified    Boolean   @default(false)
   collectionVerifiedBy  String?

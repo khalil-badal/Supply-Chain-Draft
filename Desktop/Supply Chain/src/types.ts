@@ -124,6 +124,7 @@ export interface DeliveryRecord extends AuditFields {
   collection_verified_by?: string | null;
   collection_verified_at?: string | null;
   amount?: number | null; // Philippine Peso — required for Accounting Collection, null for others
+  address?: string;
   // Linked Accounting Collection record (set by Logistics/Admin)
   linked_collection_id?: string | null;
   linked_collection?: {

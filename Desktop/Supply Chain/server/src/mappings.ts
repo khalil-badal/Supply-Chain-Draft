@@ -59,6 +59,7 @@ export function serializeRecord(r: any) {
     is_draft: r.draft ? 'Yes' : 'No',
     date_time: r.dateAndTime,
     item_description: r.itemDescription,
+    address: r.address ?? '',
     document_attachment: r.documentAttachment,
     attachments: r.documentAttachment ? [r.documentAttachment] : [],
     collection_verified: r.collectionVerified ?? false,
