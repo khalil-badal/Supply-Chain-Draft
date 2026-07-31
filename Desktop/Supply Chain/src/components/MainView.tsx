@@ -96,7 +96,7 @@ export default function MainView({ records, currentUserRole, currentUserName, on
     let result = filtered;
     if (dateFrom) result = result.filter(r => r.delivery_date && r.delivery_date >= dateFrom);
     if (dateTo)   result = result.filter(r => r.delivery_date && r.delivery_date <= dateTo);
-    return sortRecordsByDate(result, sortMode);
+    return (dateFrom || dateTo) ? result : sortRecordsByDate(result, sortMode);
   }, [filtered, dateFrom, dateTo, sortMode]);
 
   const handleRowClick = (record: DeliveryRecord) => {
@@ -178,8 +178,11 @@ export default function MainView({ records, currentUserRole, currentUserName, on
         <select
           value={sortMode}
           onChange={e => setSortMode(e.target.value as DateSortMode)}
-          className="px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#0078C1]/30 focus:border-[#0078C1]"
+          disabled={!!(dateFrom || dateTo)}
+          title={(dateFrom || dateTo) ? 'Sort order is N/A while a date range filter is active' : undefined}
+          className={`px-3 py-2 border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#0078C1]/30 focus:border-[#0078C1] ${(dateFrom || dateTo) ? 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed' : 'border-slate-300 bg-white cursor-pointer'}`}
         >
+          {(dateFrom || dateTo) && <option value={sortMode}>Sort: N/A</option>}
           <option value="nearest">Nearest to Present</option>
           <option value="oldest">Oldest First</option>
           <option value="furthest">Furthest Future First</option>
