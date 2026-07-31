@@ -16,7 +16,7 @@ import {
   FileBarChart2
 } from 'lucide-react';
 import ExportMenu from './ExportMenu';
-import { downloadDriverReport } from '../utils/exportDriverReport';
+import DriverReportModal from './DriverReportModal';
 import RouteSlipMenu from './RouteSlipMenu';
 import AccountManagerCombobox from './AccountManagerCombobox';
 import { computeAllOpsSummary } from '../utils/allOpsExport';
@@ -104,8 +104,8 @@ export default function DeliveryRecordsView({
   const [bulkStatus, setBulkStatus] = useState<string>('Delivered');
   const [bulkApplying, setBulkApplying] = useState(false);
 
-  // Monthly Driver Report (Logistics / Admin, Deliveries only)
-  const [driverReportLoading, setDriverReportLoading] = useState(false);
+  // Monthly Driver Report modal
+  const [showDriverReportModal, setShowDriverReportModal] = useState(false);
 
   // Generate Sample (Admin only)
   const [showSampler, setShowSampler] = useState(false);
@@ -414,23 +414,20 @@ export default function DeliveryRecordsView({
           {/* Monthly Driver Report — Logistics / Admin, Deliveries only */}
           {(currentUserRole === 'Logistics' || currentUserRole === 'Admin') && category === 'Deliveries' && (
             <button
-              onClick={async () => {
-                setDriverReportLoading(true);
-                try {
-                  await downloadDriverReport(records, currentUserName, currentUserRole);
-                } finally {
-                  setDriverReportLoading(false);
-                }
-              }}
-              disabled={driverReportLoading}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-600 hover:text-blue-700 text-[11px] font-bold rounded-lg transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              onClick={() => setShowDriverReportModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-600 hover:text-blue-700 text-[11px] font-bold rounded-lg transition-all cursor-pointer"
             >
-              {driverReportLoading
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <FileBarChart2 className="w-3.5 h-3.5 text-blue-500" />
-              }
+              <FileBarChart2 className="w-3.5 h-3.5 text-blue-500" />
               Monthly Driver Report
             </button>
+          )}
+          {showDriverReportModal && (
+            <DriverReportModal
+              records={records}
+              onClose={() => setShowDriverReportModal(false)}
+              generatedByName={currentUserName}
+              generatedByRole={currentUserRole}
+            />
           )}
           {/* Generate Sample — Admin only */}
           {currentUserRole === 'Admin' && (
