@@ -112,10 +112,11 @@ export type ApiDashboardStats =
     }
   | {
       role: 'TASS';
-      collections_this_month: number;
+      open_rma: number;
+      rma_on_hold: number;
+      pending_procurement_pickup: number;
       pending_verification: number;
       verified_today: number;
-      overdue_unverified: number;
     }
   | {
       role: 'ADMIN';

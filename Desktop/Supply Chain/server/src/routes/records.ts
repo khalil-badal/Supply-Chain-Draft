@@ -242,7 +242,7 @@ router.post('/', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS'), asy
 
 // Full update - ADMIN added alongside LOGISTICS for linked collection management.
 // SoD: only LOGISTICS/ADMIN may set driver/vehicle/driverAssistant/linkedCollectionId.
-router.put('/:id', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS', 'ADMIN', 'DRIVER'), async (req, res) => {
+router.put('/:id', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS', 'ADMIN', 'DRIVER', 'TASS'), async (req, res) => {
   const existing = await prisma.deliveryRecord.findFirst({ where: { id: req.params.id, deletedAt: null }, include: recordInclude });
   if (!existing) return res.status(404).json({ error: 'Record not found' });
 
@@ -250,12 +250,16 @@ router.put('/:id', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS', 'A
   if (req.user!.role === 'LOGISTICS' && existing.category === 'RMA') {
     return res.status(403).json({ error: 'Logistics has view-only access to RMA/TASS records' });
   }
+  // TASS may only write RMA records
+  if (req.user!.role === 'TASS' && existing.category !== 'RMA') {
+    return res.status(403).json({ error: 'TASS write access is limited to RMA records' });
+  }
 
   const b = req.body ?? {};
 
   const LOGISTICS_SUBSTANTIVE_FIELDS = ['driver', 'vehicle', 'driver_assistants', 'time_in', 'time_out', 'received_by', 'linked_collection_id', 'area', 'address'];
   const SC_SUBSTANTIVE_FIELDS = ['company_id', 'priority', 'reference', 'area', 'address', 'account_manager', 'delivery_date', 'item_type', 'is_draft', 'date_time', 'item_description', 'attachments', 'amount'];
-  const substantiveFields = (req.user!.role === 'LOGISTICS' || req.user!.role === 'ADMIN')
+  const substantiveFields = (req.user!.role === 'LOGISTICS' || req.user!.role === 'ADMIN' || req.user!.role === 'TASS')
     ? LOGISTICS_SUBSTANTIVE_FIELDS
     : SC_SUBSTANTIVE_FIELDS;
   const hasSubstantiveChange = substantiveFields.some(f => f in b);
@@ -273,7 +277,7 @@ router.put('/:id', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS', 'A
     if (b.time_in !== undefined) data.timeIn = b.time_in ?? null;
     if (b.time_out !== undefined) data.timeOut = b.time_out ?? null;
     if (b.received_by !== undefined) data.receivedBy = b.received_by ?? null;
-  } else if (req.user!.role === 'LOGISTICS' || req.user!.role === 'ADMIN') {
+  } else if (req.user!.role === 'LOGISTICS' || req.user!.role === 'ADMIN' || req.user!.role === 'TASS') {
     if (b.driver !== undefined) data.driver = b.driver;
     if (b.vehicle !== undefined) data.vehicle = b.vehicle;
     if (b.driver_assistants !== undefined) data.driverAssistants = JSON.stringify(Array.isArray(b.driver_assistants) ? b.driver_assistants : []);
@@ -333,7 +337,7 @@ router.put('/:id', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS', 'A
 
   // Write remark log for every non-DRIVER edit that has remarks
   if (req.user!.role !== 'DRIVER' && b.remarks && String(b.remarks).trim()) {
-    const context = (req.user!.role === 'LOGISTICS' || req.user!.role === 'ADMIN') ? 'DRIVER_UPDATE' : 'GENERAL_EDIT';
+    const context = (req.user!.role === 'LOGISTICS' || req.user!.role === 'ADMIN' || req.user!.role === 'TASS') ? 'DRIVER_UPDATE' : 'GENERAL_EDIT';
     await createRemarkLog(updated.id, b.remarks, context, req.user!.id);
   }
 
@@ -358,7 +362,7 @@ router.put('/:id', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS', 'A
 
 // Status change — Logistics, Sales Coordinator, Admin, and Driver (own records).
 // This is also the sole path that fires the ACCOMPLISHED automated trigger.
-router.patch('/:id/status', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS', 'ADMIN', 'DRIVER'), async (req, res) => {
+router.patch('/:id/status', requireAuth, requireRole('SALES_COORDINATOR', 'LOGISTICS', 'ADMIN', 'DRIVER', 'TASS'), async (req, res) => {
   const { status, remarks, time_out, received_by } = req.body ?? {};
   if (!status || !STATUS_TO_DB[status]) {
     return res.status(400).json({ error: 'Valid status is required' });
@@ -376,6 +380,9 @@ router.patch('/:id/status', requireAuth, requireRole('SALES_COORDINATOR', 'LOGIS
 
   if (req.user!.role === 'LOGISTICS' && existing.category === 'RMA') {
     return res.status(403).json({ error: 'Logistics has view-only access to RMA/TASS records' });
+  }
+  if (req.user!.role === 'TASS' && existing.category !== 'RMA') {
+    return res.status(403).json({ error: 'TASS status updates are limited to RMA records' });
   }
 
   const dbStatus = STATUS_TO_DB[status];

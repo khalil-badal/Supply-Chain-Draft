@@ -253,7 +253,7 @@ export default function App() {
   const DEFAULT_ROLE_SCOPE: Record<string, string[]> = {
     'Sales Coordinator': ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'am_directory', 'transactions', 'inventory'],
     'Logistics':         ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'driver', 'calendar', 'driver_board', 'transactions', 'inventory', 'status_history', 'statistical_reports'],
-    'TASS':              ['main', 'dashboard', 'accounting_collection', 'rma', 'transactions'],
+    'TASS':              ['main', 'dashboard', 'rma', 'procurement_pickup', 'accounting_collection', 'transactions', 'inventory', 'suppliers'],
     'Admin':             ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'driver', 'admin', 'calendar', 'driver_board', 'am_directory', 'transactions', 'inventory', 'data_sampler', 'status_history', 'statistical_reports'],
     'Driver':            ['driver_dashboard'],
   };

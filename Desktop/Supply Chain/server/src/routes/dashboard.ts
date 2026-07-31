@@ -61,13 +61,15 @@ router.get('/stats', requireAuth, async (req, res) => {
 
   // ── TASS ─────────────────────────────────────────────────────────────────────
   if (role === 'TASS') {
-    const now = new Date();
-    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    const twoDaysAgo = new Date(start.getTime() - 2 * 24 * 60 * 60 * 1000);
-
-    const [collectionsThisMonth, pendingVerification, verifiedToday, overdueUnverified] = await Promise.all([
+    const [openRma, rmaOnHold, pendingProcurementPickup, pendingVerification, verifiedToday] = await Promise.all([
       prisma.deliveryRecord.count({
-        where: { deletedAt: null, category: 'ACCOUNTING_COLLECTION', createdAt: { gte: monthStart } }
+        where: { deletedAt: null, category: 'RMA', status: { in: ['SCHEDULED', 'PENDING'] } }
+      }),
+      prisma.deliveryRecord.count({
+        where: { deletedAt: null, category: 'RMA', status: 'ON_HOLD' }
+      }),
+      prisma.deliveryRecord.count({
+        where: { deletedAt: null, category: 'PROCUREMENT_PICKUP', status: { in: ['SCHEDULED', 'PENDING'] } }
       }),
       prisma.deliveryRecord.count({
         where: { deletedAt: null, category: 'ACCOUNTING_COLLECTION', status: 'ACCOMPLISHED', collectionVerified: false }
@@ -79,24 +81,16 @@ router.get('/stats', requireAuth, async (req, res) => {
           collectionVerified: true,
           collectionVerifiedAt: { gte: start, lt: end }
         }
-      }),
-      prisma.deliveryRecord.count({
-        where: {
-          deletedAt: null,
-          category: 'ACCOUNTING_COLLECTION',
-          status: 'ACCOMPLISHED',
-          collectionVerified: false,
-          updatedAt: { lt: twoDaysAgo }
-        }
       })
     ]);
 
     return res.json({
       role: 'TASS',
-      collections_this_month: collectionsThisMonth,
+      open_rma: openRma,
+      rma_on_hold: rmaOnHold,
+      pending_procurement_pickup: pendingProcurementPickup,
       pending_verification: pendingVerification,
-      verified_today: verifiedToday,
-      overdue_unverified: overdueUnverified
+      verified_today: verifiedToday
     });
   }
 
