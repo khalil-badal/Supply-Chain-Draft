@@ -98,7 +98,8 @@ export default function CustomersView({
             sheetName="Customers"
             filename="customers"
             pdfTitle="Merchant Customer Registry"
-            showPdf={false}
+            showPdf={true}
+            pdfPortrait={false}
             meta={{
               reportName: 'Merchant Customer Export',
               generatedByName: currentUserName,
