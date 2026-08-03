@@ -4,7 +4,7 @@ import { requireAuth, requireRole } from '../middleware/auth';
 
 const router = Router();
 
-const DEFAULT_DRIVERS = [
+const DEFAULT_SEED = [
   { name: 'Lando Navarro',     type: 'DRIVER',    areas: ['Makati', 'BGC', 'Taguig', 'Mandaluyong', 'San Juan', 'Pasig', 'Ortigas'] },
   { name: 'Manny Santos',      type: 'DRIVER',    areas: ['Quezon City', 'Marikina', 'Caloocan', 'Valenzuela', 'Malabon', 'Bulacan', 'Cainta', 'Antipolo'] },
   { name: 'Ronald de la Cruz', type: 'DRIVER',    areas: ['Manila', 'Parañaque', 'Pasay', 'Las Piñas', 'Muntinlupa', 'Cavite', 'Laguna', 'Batangas'] },
@@ -27,13 +27,61 @@ function serialize(d: any) {
   };
 }
 
+// Scan delivery records for driver/assistant names not yet in the Driver table
+// and auto-import them so the Driver Manager stays in sync with actual usage.
+async function syncDriversFromRecords() {
+  const managed = await prisma.driver.findMany({ select: { name: true } });
+  const knownNames = new Set(managed.map(d => d.name));
+
+  // Distinct driver names from delivery records
+  const driverRows: { driver: string }[] = await prisma.deliveryRecord.findMany({
+    where: { driver: { not: '' }, deletedAt: null },
+    select: { driver: true },
+    distinct: ['driver'],
+  });
+
+  // Distinct assistant names (stored as JSON array string per record)
+  const assistantRows: { driverAssistants: string }[] = await prisma.deliveryRecord.findMany({
+    where: { driverAssistants: { not: '[]' }, deletedAt: null },
+    select: { driverAssistants: true },
+    distinct: ['driverAssistants'],
+  });
+  const assistantNames = new Set<string>();
+  for (const row of assistantRows) {
+    try {
+      const arr = JSON.parse(row.driverAssistants);
+      if (Array.isArray(arr)) arr.forEach((n: string) => { if (n.trim()) assistantNames.add(n.trim()); });
+    } catch { /* skip malformed */ }
+  }
+
+  const toCreate: { name: string; type: string; coverageAreas: string; createdBy: string; modifiedBy: string }[] = [];
+
+  for (const row of driverRows) {
+    if (row.driver.trim() && !knownNames.has(row.driver.trim())) {
+      knownNames.add(row.driver.trim());
+      toCreate.push({ name: row.driver.trim(), type: 'DRIVER', coverageAreas: '[]', createdBy: 'system', modifiedBy: 'system' });
+    }
+  }
+  for (const name of assistantNames) {
+    if (!knownNames.has(name)) {
+      knownNames.add(name);
+      toCreate.push({ name, type: 'ASSISTANT', coverageAreas: '[]', createdBy: 'system', modifiedBy: 'system' });
+    }
+  }
+
+  if (toCreate.length > 0) {
+    await prisma.driver.createMany({ data: toCreate });
+  }
+}
+
 // List all drivers (active only by default, ?all=1 for all)
-// Auto-seeds the default drivers if the table is empty.
+// On first call (empty table): seeds hardcoded defaults + drivers found in records.
 router.get('/', requireAuth, async (req, res) => {
   const total = await prisma.driver.count();
   if (total === 0) {
+    // Seed hardcoded defaults first
     await prisma.driver.createMany({
-      data: DEFAULT_DRIVERS.map(d => ({
+      data: DEFAULT_SEED.map(d => ({
         name: d.name,
         type: d.type,
         coverageAreas: JSON.stringify(d.areas),
@@ -42,6 +90,10 @@ router.get('/', requireAuth, async (req, res) => {
       })),
     });
   }
+  // Always sync: import any driver/assistant names from delivery records
+  // that aren't in the Driver table yet.
+  await syncDriversFromRecords();
+
   const where = req.query.all === '1' ? {} : { isActive: true };
   const drivers = await prisma.driver.findMany({ where, orderBy: { name: 'asc' } });
   res.json(drivers.map(serialize));
@@ -84,7 +136,7 @@ router.put('/:id', requireAuth, requireRole('LOGISTICS', 'ADMIN'), async (req, r
   res.json(serialize(updated));
 });
 
-// Delete a driver — Logistics + Admin only (soft-delete via is_active=false preferred, but hard-delete supported)
+// Delete a driver — Logistics + Admin only
 router.delete('/:id', requireAuth, requireRole('LOGISTICS', 'ADMIN'), async (req, res) => {
   const existing = await prisma.driver.findUnique({ where: { id: req.params.id } });
   if (!existing) return res.status(404).json({ error: 'Driver not found' });
