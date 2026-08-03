@@ -305,16 +305,16 @@ function buildSheet1(
   const totPend = [...stats.values()].reduce((n, s) => n + s.pend, 0);
   const grand   = totAcc + totRH + totPend;
   ws.getRow(r).height = 16;
-  ['TOTALS', totAcc, totRH, totPend, grand].forEach((v, i) => {
+  ['Total', totAcc, totRH, totPend, grand].forEach((v, i) => {
     const c = ws.getRow(r).getCell(i + 1);
     c.value = v;
     sc(c, { bg: NAVY, bold: true, color: WHITE, h: i === 0 ? 'left' : 'center', bdrColor: NAVY });
   });
   r++;
 
-  // PERCENTAGE row
+  // Percentage row
   ws.getRow(r).height = 16;
-  ['PERCENTAGE', pct(totAcc, grand), pct(totRH, grand), pct(totPend, grand), 1].forEach((v, i) => {
+  ['Percentage', pct(totAcc, grand), pct(totRH, grand), pct(totPend, grand), 1].forEach((v, i) => {
     const c = ws.getRow(r).getCell(i + 1);
     c.value = v;
     sc(c, { bg: DARKER, bold: true, color: GOLD, h: i === 0 ? 'left' : 'center', fmt: i >= 1 ? '0.00%' : undefined, bdrColor: DARKER });
@@ -336,7 +336,7 @@ function buildSheet1(
   const depLbl = ws.getRow(r).getCell(1);
   depLbl.value = 'DEPARTURE';
   depLbl.fill = fillSolid(NAVY);
-  depLbl.font = { bold: true, size: 12, color: { argb: GOLD } };
+  depLbl.font = { bold: true, italic: true, size: 12, color: { argb: GOLD } };
   depLbl.alignment = { vertical: 'middle', horizontal: 'center' };
   depLbl.border = bdr(NAVY);
 
@@ -344,7 +344,7 @@ function buildSheet1(
   const arrLbl = ws.getRow(r).getCell(7);
   arrLbl.value = 'ARRIVAL';
   arrLbl.fill = fillSolid(NAVY);
-  arrLbl.font = { bold: true, size: 12, color: { argb: GOLD } };
+  arrLbl.font = { bold: true, italic: true, size: 12, color: { argb: GOLD } };
   arrLbl.alignment = { vertical: 'middle', horizontal: 'center' };
   arrLbl.border = bdr(NAVY);
   ws.getRow(r).height = 20;
@@ -352,7 +352,7 @@ function buildSheet1(
 
   // Targets row (both sides)
   ws.getRow(r).height = 16;
-  ['TARGETS', ...TIME_TARGETS, null].forEach((v, i) => {
+  ['Targets', ...TIME_TARGETS, null].forEach((v, i) => {
     const c = ws.getRow(r).getCell(i + 1);
     if (v !== null) {
       c.value = v;
@@ -361,7 +361,7 @@ function buildSheet1(
       c.border = bdr();
     }
   });
-  ['TARGETS', ...TIME_TARGETS, null].forEach((v, i) => {
+  ['Targets', ...TIME_TARGETS, null].forEach((v, i) => {
     const c = ws.getRow(r).getCell(7 + i);
     if (v !== null) {
       c.value = v;
@@ -412,12 +412,12 @@ function buildSheet1(
   const depGrand = depTot.reduce((a, b) => a + b, 0);
   const arrGrand = arrTot.reduce((a, b) => a + b, 0);
   ws.getRow(r).height = 16;
-  ['TOTALS', ...depTot, depGrand].forEach((v, i) => {
+  ['TOTAL', ...depTot, depGrand].forEach((v, i) => {
     const c = ws.getRow(r).getCell(i + 1);
     c.value = v;
     sc(c, { bg: NAVY, bold: true, color: WHITE, h: i === 0 ? 'left' : 'center', bdrColor: NAVY });
   });
-  ['TOTALS', ...arrTot, arrGrand].forEach((v, i) => {
+  ['TOTAL', ...arrTot, arrGrand].forEach((v, i) => {
     const c = ws.getRow(r).getCell(7 + i);
     c.value = v;
     sc(c, { bg: NAVY, bold: true, color: WHITE, h: i === 0 ? 'left' : 'center', bdrColor: NAVY });
@@ -428,12 +428,12 @@ function buildSheet1(
   const depCuml = depTot.map((_, i) => depTot.slice(0, i + 1).reduce((a, b) => a + b, 0));
   const arrCuml = arrTot.map((_, i) => arrTot.slice(0, i + 1).reduce((a, b) => a + b, 0));
   ws.getRow(r).height = 16;
-  ['TOTAL NUMBER', ...depCuml, depGrand].forEach((v, i) => {
+  ['Total Number', ...depCuml, depGrand].forEach((v, i) => {
     const c = ws.getRow(r).getCell(i + 1);
     c.value = v;
     sc(c, { bg: 'FFDDEBF7', bold: true, color: DARKER, h: i === 0 ? 'left' : 'center' });
   });
-  ['TOTAL NUMBER', ...arrCuml, arrGrand].forEach((v, i) => {
+  ['Total Number', ...arrCuml, arrGrand].forEach((v, i) => {
     const c = ws.getRow(r).getCell(7 + i);
     c.value = v;
     sc(c, { bg: 'FFDDEBF7', bold: true, color: DARKER, h: i === 0 ? 'left' : 'center' });
@@ -442,12 +442,12 @@ function buildSheet1(
 
   // Percentage row (both sides)
   ws.getRow(r).height = 16;
-  ['PERCENTAGE', ...depTot.map(t => pct(t, depGrand)), 1].forEach((v, i) => {
+  ['Percentage', ...depTot.map(t => pct(t, depGrand)), 1].forEach((v, i) => {
     const c = ws.getRow(r).getCell(i + 1);
     c.value = v;
     sc(c, { bg: DARKER, bold: true, color: GOLD, h: i === 0 ? 'left' : 'center', fmt: i >= 1 ? '0.00%' : undefined, bdrColor: DARKER });
   });
-  ['PERCENTAGE', ...arrTot.map(t => pct(t, arrGrand)), 1].forEach((v, i) => {
+  ['Percentage', ...arrTot.map(t => pct(t, arrGrand)), 1].forEach((v, i) => {
     const c = ws.getRow(r).getCell(7 + i);
     c.value = v;
     sc(c, { bg: DARKER, bold: true, color: GOLD, h: i === 0 ? 'left' : 'center', fmt: i >= 1 ? '0.00%' : undefined, bdrColor: DARKER });
@@ -459,121 +459,156 @@ function buildSheet1(
   r++;
 
   // ── Area Coverage section ────────────────────────────────────────────────────
-  // Left  (A–C): group detail tables
-  // Right (G–K): area summary by group
-  // Right extra: TOTAL AREA COVERED
+  // Left  (A–C): area group detail tables
+  // Right (G–I): area summary
+  // Right (K–L): TOTAL AREA COVERED box
 
-  // Section label spanning full width
-  ws.mergeCells(r, 1, r, TOTAL_COLS);
-  const areaLbl = ws.getRow(r).getCell(1);
-  areaLbl.value = `DELIVERY ${month} ${year}  —  AREA COVERAGE`;
-  areaLbl.fill = fillSolid(NAVY);
-  areaLbl.font = { bold: true, size: 11, color: { argb: GOLD } };
-  areaLbl.alignment = { vertical: 'middle', horizontal: 'center' };
-  areaLbl.border = bdr(NAVY);
+  const totalDeliveries = deliveries.length;
+
+  // Section label row: "DELIVERY MONTH YEAR" on both sides + TOTAL AREA COVERED
+  ws.mergeCells(r, 1, r, 3);
+  const areaLblL = ws.getRow(r).getCell(1);
+  areaLblL.value = `DELIVERY ${month} ${year}`;
+  areaLblL.fill = fillSolid(NAVY);
+  areaLblL.font = { bold: true, size: 10, color: { argb: GOLD } };
+  areaLblL.alignment = { vertical: 'middle', horizontal: 'center' };
+  areaLblL.border = bdr(NAVY);
+
+  ws.mergeCells(r, 7, r, 9);
+  const areaLblR = ws.getRow(r).getCell(7);
+  areaLblR.value = `DELIVERY ${month} ${year}`;
+  areaLblR.fill = fillSolid(NAVY);
+  areaLblR.font = { bold: true, size: 10, color: { argb: GOLD } };
+  areaLblR.alignment = { vertical: 'middle', horizontal: 'center' };
+  areaLblR.border = bdr(NAVY);
+
+  ws.mergeCells(r, 11, r, 12);
+  const tacHdr = ws.getRow(r).getCell(11);
+  tacHdr.value = 'TOTAL AREA COVERED';
+  tacHdr.fill = fillSolid(NAVY);
+  tacHdr.font = { bold: true, size: 10, color: { argb: GOLD } };
+  tacHdr.alignment = { vertical: 'middle', horizontal: 'center' };
+  tacHdr.border = bdr(NAVY);
   ws.getRow(r).height = 18;
   r++;
 
-  // Detail header (A–C)
-  ws.getRow(r).height = 16;
-  ['Area Group / Location', 'Area / Subarea', 'Count'].forEach((v, i) => {
-    const c = ws.getRow(r).getCell(i + 1);
-    c.value = v;
-    sc(c, { bg: NAVY, bold: true, color: WHITE, h: i <= 1 ? 'left' : 'center', bdrColor: NAVY });
-  });
-
-  // Summary header (G–K)
-  ['Area Group', 'Total Deliveries', '% of All', 'Drivers Active', 'Avg/Driver'].forEach((v, i) => {
+  // Right-side summary column headers (G–I)
+  const summaryStartRow = r;
+  ['Areas', 'QTY.', '% per Area'].forEach((v, i) => {
     const c = ws.getRow(r).getCell(7 + i);
     c.value = v;
     sc(c, { bg: NAVY, bold: true, color: WHITE, h: i === 0 ? 'left' : 'center', bdrColor: NAVY });
   });
-  r++;
 
-  const totalDeliveries = deliveries.length;
-  const summaryStartRow = r;
+  // Build summary data and detail tables per group
+  const groupSummary: { label: string; num: number; total: number }[] = [];
+  let groupIdx = 0;
 
-  // Build summary data per group
-  const groupSummary: { label: string; total: number; driverCount: number }[] = [];
   for (const group of AREA_GROUPS) {
-    const groupAreas = group.areas.filter(a => deliveries.some(d => d.area === a));
-    const groupTotal = groupAreas.reduce((n, a) => n + deliveries.filter(d => d.area === a).length, 0);
+    groupIdx++;
+    const allGroupAreas = group.areas;
+    const groupTotal = allGroupAreas.reduce((n, a) => n + deliveries.filter(d => d.area === a).length, 0);
     if (groupTotal === 0) continue;
 
-    const activeDrivers = new Set(deliveries.filter(d => groupAreas.includes(d.area ?? '')).map(d => d.driver).filter(Boolean)).size;
-    groupSummary.push({ label: group.label, total: groupTotal, driverCount: activeDrivers });
+    groupSummary.push({ label: `Area ${groupIdx}`, num: groupIdx, total: groupTotal });
 
-    // Detail rows
-    let first = true;
-    for (const area of groupAreas) {
+    // Group header row: "AREAS (N)" | "Client Per Area" | "% per Area"
+    ws.getRow(r).height = 16;
+    const grpHdr = ws.getRow(r).getCell(1);
+    grpHdr.value = `AREAS (${groupIdx})`;
+    sc(grpHdr, { bg: NAVY, bold: true, color: GOLD, h: 'left', bdrColor: NAVY });
+    const cpHdr = ws.getRow(r).getCell(2);
+    cpHdr.value = 'Client Per Area';
+    sc(cpHdr, { bg: NAVY, bold: true, color: WHITE, h: 'center', bdrColor: NAVY });
+    const ppHdr = ws.getRow(r).getCell(3);
+    ppHdr.value = '% per Area';
+    sc(ppHdr, { bg: NAVY, bold: true, color: WHITE, h: 'center', bdrColor: NAVY });
+    r++;
+
+    // Area detail rows (show all areas in group, even zero-count)
+    for (const area of allGroupAreas) {
       const cnt = deliveries.filter(d => d.area === area).length;
-      if (cnt === 0) continue;
       ws.getRow(r).height = 15;
 
-      const labelCell = ws.getRow(r).getCell(1);
-      labelCell.value = first ? group.label : '';
-      sc(labelCell, { bg: first ? LTGOLD : WHITE, bold: first, color: DARKER, h: 'left' });
+      const nameCell = ws.getRow(r).getCell(1);
+      nameCell.value = area;
+      sc(nameCell, { bg: WHITE, color: DARKER, h: 'left' });
 
-      const areaCell = ws.getRow(r).getCell(2);
-      areaCell.value = area;
-      sc(areaCell, { bg: WHITE, color: DARKER, h: 'left' });
-
-      const cntCell = ws.getRow(r).getCell(3);
+      const cntCell = ws.getRow(r).getCell(2);
       cntCell.value = cnt;
-      sc(cntCell, { bg: WHITE, color: DARKER, h: 'center' });
+      sc(cntCell, { bg: WHITE, color: DARKER, bold: true, h: 'center' });
 
-      first = false;
+      const pctCell = ws.getRow(r).getCell(3);
+      pctCell.value = groupTotal > 0 ? Math.round((cnt / groupTotal) * 10000) / 100 : 0;
+      sc(pctCell, { bg: WHITE, color: DARKER, h: 'center', fmt: '0.00' });
       r++;
     }
 
-    // Group subtotal
-    ws.getRow(r).height = 15;
-    ws.mergeCells(r, 1, r, 2);
-    const stLabel = ws.getRow(r).getCell(1);
-    stLabel.value = `${group.label.split(' — ')[0]} SUBTOTAL`;
-    sc(stLabel, { bg: GOLD, bold: true, color: DARKER, h: 'left' });
-
-    const stCnt = ws.getRow(r).getCell(3);
-    stCnt.value = groupTotal;
-    sc(stCnt, { bg: GOLD, bold: true, color: DARKER, h: 'center' });
+    // Group total row
+    ws.getRow(r).height = 16;
+    const totLbl = ws.getRow(r).getCell(1);
+    totLbl.value = 'Total';
+    sc(totLbl, { bg: GOLD, bold: true, color: DARKER, h: 'left' });
+    const totCnt = ws.getRow(r).getCell(2);
+    totCnt.value = groupTotal;
+    sc(totCnt, { bg: GOLD, bold: true, color: DARKER, h: 'center' });
+    const totPctC = ws.getRow(r).getCell(3);
+    totPctC.value = 100.00;
+    sc(totPctC, { bg: GOLD, bold: true, color: DARKER, h: 'center', fmt: '0.00' });
     r++;
 
+    // Blank separator
     ws.getRow(r).height = 4;
     r++;
   }
 
-  // Summary table on the right (G–K), starting at summaryStartRow
-  let sr = summaryStartRow;
+  // Right-side summary data rows (G–I), starting one row below the header
+  let sr = summaryStartRow + 1;
   for (const gs of groupSummary) {
     ws.getRow(sr).height = 15;
-    const avgPerDriver = gs.driverCount > 0 ? Math.round(gs.total / gs.driverCount) : 0;
-    [gs.label, gs.total, pct(gs.total, totalDeliveries), gs.driverCount, avgPerDriver].forEach((v, i) => {
-      const c = ws.getRow(sr).getCell(7 + i);
-      c.value = v;
-      sc(c, { bg: i === 0 ? LTGOLD : WHITE, bold: i === 0, color: DARKER, h: i === 0 ? 'left' : 'center', fmt: i === 2 ? '0.00%' : undefined });
-    });
+    const lbl = ws.getRow(sr).getCell(7);
+    lbl.value = gs.label;
+    sc(lbl, { bg: LTGOLD, bold: true, color: DARKER, h: 'left' });
+    const qty = ws.getRow(sr).getCell(8);
+    qty.value = gs.total;
+    sc(qty, { bg: WHITE, bold: true, color: DARKER, h: 'center' });
+    const pp = ws.getRow(sr).getCell(9);
+    pp.value = totalDeliveries > 0 ? Math.round((gs.total / totalDeliveries) * 10000) / 100 : 0;
+    sc(pp, { bg: WHITE, color: DARKER, h: 'center', fmt: '0.00' });
     sr++;
   }
 
-  // TOTAL AREA COVERED
+  // Summary total row
   const allAreaCount = AREA_GROUPS.flatMap(g => g.areas).reduce((n, a) => n + deliveries.filter(d => d.area === a).length, 0);
   ws.getRow(sr).height = 16;
-  ws.mergeCells(sr, 7, sr, 8);
-  const totAreaLbl = ws.getRow(sr).getCell(7);
-  totAreaLbl.value = 'TOTAL AREA COVERED';
-  sc(totAreaLbl, { bg: NAVY, bold: true, color: GOLD, h: 'center', bdrColor: NAVY });
+  const stLbl = ws.getRow(sr).getCell(7);
+  stLbl.value = 'Total';
+  sc(stLbl, { bg: NAVY, bold: true, color: GOLD, h: 'left', bdrColor: NAVY });
+  const stQty = ws.getRow(sr).getCell(8);
+  stQty.value = allAreaCount;
+  sc(stQty, { bg: NAVY, bold: true, color: WHITE, h: 'center', bdrColor: NAVY });
+  const stPp = ws.getRow(sr).getCell(9);
+  stPp.value = 100.00;
+  sc(stPp, { bg: NAVY, bold: true, color: WHITE, h: 'center', fmt: '0.00', bdrColor: NAVY });
 
-  const totAreaCnt = ws.getRow(sr).getCell(9);
-  totAreaCnt.value = allAreaCount;
-  sc(totAreaCnt, { bg: NAVY, bold: true, color: WHITE, h: 'center', bdrColor: NAVY });
+  // TOTAL AREA COVERED box (K–L): month name + total number
+  const tacMonthRow = summaryStartRow + 1;
+  ws.mergeCells(tacMonthRow, 11, tacMonthRow, 12);
+  const tacMonth = ws.getRow(tacMonthRow).getCell(11);
+  tacMonth.value = month;
+  tacMonth.fill = fillSolid(GOLD);
+  tacMonth.font = { bold: true, size: 16, color: { argb: NAVY } };
+  tacMonth.alignment = { vertical: 'middle', horizontal: 'center' };
+  tacMonth.border = bdr(NAVY);
 
-  const totAreaPct = ws.getRow(sr).getCell(10);
-  totAreaPct.value = pct(allAreaCount, totalDeliveries);
-  sc(totAreaPct, { bg: NAVY, bold: true, color: WHITE, h: 'center', fmt: '0.00%', bdrColor: NAVY });
-
-  const totAllCell = ws.getRow(sr).getCell(11);
-  totAllCell.value = totalDeliveries;
-  sc(totAllCell, { bg: DARKER, bold: true, color: GOLD, h: 'center', bdrColor: DARKER });
+  const tacNumRow = tacMonthRow + 1;
+  ws.mergeCells(tacNumRow, 11, tacNumRow + 1, 12);
+  const tacNum = ws.getRow(tacNumRow).getCell(11);
+  tacNum.value = allAreaCount;
+  tacNum.fill = fillSolid(WHITE);
+  tacNum.font = { bold: true, size: 22, color: { argb: NAVY } };
+  tacNum.alignment = { vertical: 'middle', horizontal: 'center' };
+  tacNum.border = bdr(NAVY);
 }
 
 // ─── Excel Sheet 2: Summary ──────────────────────────────────────────────────
@@ -590,14 +625,14 @@ function buildSheet2(
   const MAIN_C  = 15;
   const VEH_START = 17;
 
-  ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 5 }];
+  ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 6 }];
   ws.getColumn(1).width  = 26;
   for (let c = 2; c <= 5; c++)  ws.getColumn(c).width = 13;
   for (let c = 6; c <= 10; c++) ws.getColumn(c).width = 14;
   for (let c = 11; c <= 15; c++) ws.getColumn(c).width = 14;
   ws.getColumn(16).width = 4;
   ws.getColumn(17).width = 22;
-  for (let c = 18; c <= 20; c++) ws.getColumn(c).width = 13;
+  for (let c = 18; c <= 21; c++) ws.getColumn(c).width = 13;
 
   let r = 1;
 
@@ -609,7 +644,7 @@ function buildSheet2(
     ws.getRow(rr).height = rr === 1 ? 24 : 14;
   }
   const t1 = ws.getRow(1).getCell(1);
-  t1.value = `SUMMARY — DRIVER REPORT ${month} ${year}`;
+  t1.value = `DELIVERY REPORT ${month} SUMMARY`;
   t1.font = { bold: true, size: 14, color: { argb: GOLD } };
   t1.alignment = { vertical: 'middle', horizontal: 'center' };
 
@@ -629,9 +664,9 @@ function buildSheet2(
   ws.getRow(r).height = 18;
   const grpSpans = [
     { label: "Driver's Name",       start: 1,  end: 1,  bg: NAVY,    color: WHITE },
-    { label: 'Delivery Performance', start: 2,  end: 5,  bg: 'FF2E5496', color: WHITE },
-    { label: 'Departure Time',       start: 6,  end: 10, bg: 'FF1F4E79', color: WHITE },
-    { label: 'Arrival Time',         start: 11, end: 15, bg: 'FF833C00', color: WHITE },
+    { label: `Deliveries ${year}`,   start: 2,  end: 5,  bg: 'FF2E5496', color: WHITE },
+    { label: 'Departure',            start: 6,  end: 10, bg: 'FF1F4E79', color: WHITE },
+    { label: 'Arrival',              start: 11, end: 15, bg: 'FF833C00', color: WHITE },
   ];
   for (const g of grpSpans) {
     if (g.start < g.end) ws.mergeCells(r, g.start, r, g.end);
@@ -643,13 +678,35 @@ function buildSheet2(
     cell.border = bdr(g.bg);
   }
   // Vehicle section group
-  ws.mergeCells(r, VEH_START, r, VEH_START + 3);
+  ws.mergeCells(r, VEH_START, r, VEH_START + 4);
   const vGrp = ws.getRow(r).getCell(VEH_START);
   vGrp.value = 'Vehicle Plate Breakdown';
   vGrp.fill = fillSolid('FF4D4D4D');
   vGrp.font = { bold: true, size: 10, color: { argb: WHITE } };
   vGrp.alignment = { vertical: 'middle', horizontal: 'center' };
   vGrp.border = bdr('FF4D4D4D');
+  r++;
+
+  // Targets row
+  ws.getRow(r).height = 16;
+  const tgtNameCell = ws.getRow(r).getCell(1);
+  tgtNameCell.value = 'Targets';
+  sc(tgtNameCell, { bg: GOLD, bold: true, color: DARKER, h: 'left' });
+  ['98%', '1%', '1%', ''].forEach((v, i) => {
+    const c = ws.getRow(r).getCell(2 + i);
+    c.value = v;
+    sc(c, { bg: GOLD, bold: true, color: DARKER, h: 'center' });
+  });
+  ['50%', '85%', '95%', '100%', ''].forEach((v, i) => {
+    const c = ws.getRow(r).getCell(6 + i);
+    c.value = v;
+    sc(c, { bg: GOLD, bold: true, color: DARKER, h: 'center' });
+  });
+  ['50%', '85%', '95%', '100%', ''].forEach((v, i) => {
+    const c = ws.getRow(r).getCell(11 + i);
+    c.value = v;
+    sc(c, { bg: GOLD, bold: true, color: DARKER, h: 'center' });
+  });
   r++;
 
   // Column sub-headers
@@ -662,10 +719,10 @@ function buildSheet2(
     c.value = v;
     sc(c, { bg: NAVY, bold: true, color: WHITE, h: i === 0 ? 'left' : 'center', bdrColor: NAVY });
   });
-  ['Vehicle', 'Accomplished', 'Resched/Hold', 'Pending'].forEach((v, i) => {
+  ['Vehicle', 'Accomplished', 'Resched/Hold', 'Pending', 'Total'].forEach((v, i) => {
     const c = ws.getRow(r).getCell(VEH_START + i);
     c.value = v;
-    sc(c, { bg: 'FF4D4D4D', bold: true, color: WHITE, h: i === 0 ? 'left' : 'center', bdrColor: '4D4D4D' });
+    sc(c, { bg: 'FF4D4D4D', bold: true, color: WHITE, h: i === 0 ? 'left' : 'center', bdrColor: 'FF4D4D4D' });
   });
   r++;
 
@@ -688,7 +745,7 @@ function buildSheet2(
     r++;
   });
 
-  // TOTALS + PERCENTAGE
+  // Total + Percentage rows
   const totAcc  = [...stats.values()].reduce((n, s) => n + s.acc, 0);
   const totRH   = [...stats.values()].reduce((n, s) => n + s.rh, 0);
   const totPend = [...stats.values()].reduce((n, s) => n + s.pend, 0);
@@ -699,7 +756,7 @@ function buildSheet2(
   const arrGrand = arrTot.reduce((a, b) => a + b, 0);
 
   ws.getRow(r).height = 16;
-  ['TOTALS', totAcc, totRH, totPend, grand, ...depTot, depGrand, ...arrTot, arrGrand].forEach((v, i) => {
+  ['Total', totAcc, totRH, totPend, grand, ...depTot, depGrand, ...arrTot, arrGrand].forEach((v, i) => {
     const c = ws.getRow(r).getCell(i + 1);
     c.value = v;
     sc(c, { bg: NAVY, bold: true, color: WHITE, h: i === 0 ? 'left' : 'center', bdrColor: NAVY });
@@ -708,7 +765,7 @@ function buildSheet2(
 
   ws.getRow(r).height = 16;
   const pctVals = [
-    'PERCENTAGE',
+    'Percentage',
     pct(totAcc, grand), pct(totRH, grand), pct(totPend, grand), 1,
     ...depTot.map(t => pct(t, depGrand)), 1,
     ...arrTot.map(t => pct(t, arrGrand)), 1,
@@ -720,41 +777,122 @@ function buildSheet2(
   });
   r++;
 
-  // Vehicle breakdown (right side, starting at data rows)
+  // Vehicle breakdown (right side, starting after targets + col headers)
   const allVehicles = [...new Set(assigned.map(rec => rec.vehicle?.trim()).filter(Boolean) as string[])].sort();
-  let vr = 6; // data starts at row 6 (after 3 title + 1 group hdr + 1 col hdr)
+  let vr = 7; // data starts at row 7 (3 title + 1 group hdr + 1 targets + 1 col hdr)
   for (const v of allVehicles) {
     const recs = assigned.filter(rec => rec.vehicle?.trim() === v);
+    const vAccN = recs.filter(rec => rec.status === 'Delivered').length;
+    const vRHN  = recs.filter(rec => rec.status === 'Rescheduled' || rec.status === 'On-Hold').length;
+    const vPendN = recs.filter(rec => rec.status === 'Pending' || rec.status === 'Scheduled').length;
+    const vTotal = vAccN + vRHN + vPendN;
     ws.getRow(vr).height = 15;
-    const plateCell = ws.getRow(vr).getCell(VEH_START);
-    plateCell.value = v;
-    sc(plateCell, { bg: WHITE, color: DARKER, h: 'left' });
-    const vAcc = ws.getRow(vr).getCell(VEH_START + 1);
-    vAcc.value = recs.filter(rec => rec.status === 'Delivered').length;
-    sc(vAcc, { bg: WHITE, color: DARKER, h: 'center' });
-    const vRH = ws.getRow(vr).getCell(VEH_START + 2);
-    vRH.value = recs.filter(rec => rec.status === 'Rescheduled' || rec.status === 'On-Hold').length;
-    sc(vRH, { bg: WHITE, color: DARKER, h: 'center' });
-    const vPend = ws.getRow(vr).getCell(VEH_START + 3);
-    vPend.value = recs.filter(rec => rec.status === 'Pending' || rec.status === 'Scheduled').length;
-    sc(vPend, { bg: WHITE, color: DARKER, h: 'center' });
+    [v, vAccN, vRHN, vPendN, vTotal].forEach((val, i) => {
+      const c = ws.getRow(vr).getCell(VEH_START + i);
+      c.value = val;
+      sc(c, { bg: WHITE, color: DARKER, bold: i === 0, h: i === 0 ? 'left' : 'center' });
+    });
     vr++;
   }
+  // Vehicle Total row
+  const vTotAcc  = assigned.filter(rec => rec.status === 'Delivered').length;
+  const vTotRH   = assigned.filter(rec => rec.status === 'Rescheduled' || rec.status === 'On-Hold').length;
+  const vTotPend = assigned.filter(rec => rec.status === 'Pending' || rec.status === 'Scheduled').length;
+  const vGrandTot = vTotAcc + vTotRH + vTotPend;
+  ws.getRow(vr).height = 16;
+  ['Total', vTotAcc, vTotRH, vTotPend, vGrandTot].forEach((val, i) => {
+    const c = ws.getRow(vr).getCell(VEH_START + i);
+    c.value = val;
+    sc(c, { bg: NAVY, bold: true, color: WHITE, h: i === 0 ? 'left' : 'center', bdrColor: NAVY });
+  });
+  vr++;
+  // Vehicle Percentage row
+  ws.getRow(vr).height = 16;
+  ['Percentage', pct(vTotAcc, vGrandTot), pct(vTotRH, vGrandTot), pct(vTotPend, vGrandTot), 1].forEach((val, i) => {
+    const c = ws.getRow(vr).getCell(VEH_START + i);
+    c.value = val;
+    sc(c, { bg: DARKER, bold: true, color: GOLD, h: i === 0 ? 'left' : 'center', fmt: i >= 1 ? '0.00%' : undefined, bdrColor: DARKER });
+  });
+  vr++;
+
+  // ── Right-side area summary (below vehicle breakdown) ──
+  vr++;
+  ws.mergeCells(vr, VEH_START, vr, VEH_START + 4);
+  const areaSumHdr = ws.getRow(vr).getCell(VEH_START);
+  areaSumHdr.value = `${month} SUMMARY`;
+  areaSumHdr.fill = fillSolid(NAVY);
+  areaSumHdr.font = { bold: true, size: 10, color: { argb: GOLD } };
+  areaSumHdr.alignment = { vertical: 'middle', horizontal: 'center' };
+  areaSumHdr.border = bdr(NAVY);
+  ws.getRow(vr).height = 18;
+  vr++;
+
+  // Area summary column headers
+  ['Areas', 'QTY.', '% per Area'].forEach((val, i) => {
+    const c = ws.getRow(vr).getCell(VEH_START + i);
+    c.value = val;
+    sc(c, { bg: NAVY, bold: true, color: WHITE, h: i === 0 ? 'left' : 'center', bdrColor: NAVY });
+  });
+  // TOTAL AREA COVERED header in last 2 cols
+  ws.mergeCells(vr, VEH_START + 3, vr, VEH_START + 4);
+  const tacSumHdr = ws.getRow(vr).getCell(VEH_START + 3);
+  tacSumHdr.value = 'TOTAL AREA COVERED';
+  sc(tacSumHdr, { bg: NAVY, bold: true, color: GOLD, h: 'center', bdrColor: NAVY });
+  vr++;
+
+  // Area summary data rows
+  const totalDel = deliveries.length;
+  let areaGroupIdx = 0;
+  const tacMonthVr = vr;
+  for (const group of AREA_GROUPS) {
+    areaGroupIdx++;
+    const gTotal = group.areas.reduce((n, a) => n + deliveries.filter(d => d.area === a).length, 0);
+    if (gTotal === 0) continue;
+    ws.getRow(vr).height = 15;
+    const aLbl = ws.getRow(vr).getCell(VEH_START);
+    aLbl.value = `Area ${areaGroupIdx}`;
+    sc(aLbl, { bg: LTGOLD, bold: true, color: DARKER, h: 'left' });
+    const aQty = ws.getRow(vr).getCell(VEH_START + 1);
+    aQty.value = gTotal;
+    sc(aQty, { bg: WHITE, bold: true, color: DARKER, h: 'center' });
+    const aPct = ws.getRow(vr).getCell(VEH_START + 2);
+    aPct.value = totalDel > 0 ? Math.round((gTotal / totalDel) * 10000) / 100 : 0;
+    sc(aPct, { bg: WHITE, color: DARKER, h: 'center', fmt: '0.00' });
+    vr++;
+  }
+  // Area summary total row
+  const allAreaSum = AREA_GROUPS.flatMap(g => g.areas).reduce((n, a) => n + deliveries.filter(d => d.area === a).length, 0);
+  ws.getRow(vr).height = 16;
+  const asTotLbl = ws.getRow(vr).getCell(VEH_START);
+  asTotLbl.value = 'Total';
+  sc(asTotLbl, { bg: NAVY, bold: true, color: GOLD, h: 'left', bdrColor: NAVY });
+  const asTotQty = ws.getRow(vr).getCell(VEH_START + 1);
+  asTotQty.value = allAreaSum;
+  sc(asTotQty, { bg: NAVY, bold: true, color: WHITE, h: 'center', bdrColor: NAVY });
+  const asTotPct = ws.getRow(vr).getCell(VEH_START + 2);
+  asTotPct.value = 100.00;
+  sc(asTotPct, { bg: NAVY, bold: true, color: WHITE, h: 'center', fmt: '0.00', bdrColor: NAVY });
+
+  // TOTAL AREA COVERED box (month + number)
+  ws.mergeCells(tacMonthVr, VEH_START + 3, tacMonthVr, VEH_START + 4);
+  const tacMon = ws.getRow(tacMonthVr).getCell(VEH_START + 3);
+  tacMon.value = month;
+  tacMon.fill = fillSolid(GOLD);
+  tacMon.font = { bold: true, size: 14, color: { argb: NAVY } };
+  tacMon.alignment = { vertical: 'middle', horizontal: 'center' };
+  tacMon.border = bdr(NAVY);
+  ws.mergeCells(tacMonthVr + 1, VEH_START + 3, tacMonthVr + 2, VEH_START + 4);
+  const tacNumS = ws.getRow(tacMonthVr + 1).getCell(VEH_START + 3);
+  tacNumS.value = allAreaSum;
+  tacNumS.fill = fillSolid(WHITE);
+  tacNumS.font = { bold: true, size: 20, color: { argb: NAVY } };
+  tacNumS.alignment = { vertical: 'middle', horizontal: 'center' };
+  tacNumS.border = bdr(NAVY);
 
   // Driver remarks below main table
   r += 2;
-  ws.mergeCells(r, 1, r, 5);
-  const rmkHdr = ws.getRow(r).getCell(1);
-  rmkHdr.value = 'DRIVER REMARKS (most recent per driver)';
-  rmkHdr.fill = fillSolid(NAVY);
-  rmkHdr.font = { bold: true, size: 10, color: { argb: GOLD } };
-  rmkHdr.alignment = { vertical: 'middle', horizontal: 'left' };
-  rmkHdr.border = bdr(NAVY);
-  ws.getRow(r).height = 18;
-  r++;
-
   ws.getRow(r).height = 16;
-  ["Driver's Name", 'Last Remark', null, null, null].forEach((v, i) => {
+  ["Driver's Name", 'Remarks', null, null, null].forEach((v, i) => {
     const c = ws.getRow(r).getCell(i + 1);
     if (v !== null) c.value = v;
     sc(c, { bg: NAVY, bold: true, color: WHITE, h: i === 0 ? 'left' : 'center', bdrColor: NAVY });
@@ -767,7 +905,7 @@ function buildSheet2(
     ws.getRow(r).height = 20;
     const nameCell = ws.getRow(r).getCell(1);
     nameCell.value = d;
-    sc(nameCell, { bg: idx % 2 === 1 ? EVEN : WHITE, color: DARKER, bold: true, h: 'left' });
+    sc(nameCell, { bg: GOLD, color: DARKER, bold: true, h: 'left' });
     ws.mergeCells(r, 2, r, 5);
     const rmkCell = ws.getRow(r).getCell(2);
     rmkCell.value = s.lastRemark || '—';
