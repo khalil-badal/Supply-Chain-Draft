@@ -101,30 +101,103 @@ export function acStatusLabel(status: string): string {
   return status;
 }
 export const CATEGORIES = ['Sales Orders', 'Deliveries', 'RMA', 'Accounting Collection', 'Procurement Pick-up'] as const;
-export const DRIVERS = ['Lando Navarro', 'Manny Santos', 'Ronald de la Cruz'];
-export const DRIVER_ASSISTANTS = ['Jayson Reyes', 'Bong Alvarez', 'Ricky Mendoza'];
 export const ACCOUNT_MANAGERS = ['P. Soriano', 'D. Macaraeg', 'F. Valenzuela', 'R. Pagkalinawan', 'M. Reyes', 'A. Santos', 'C. Lim'];
 
-// Area keywords covered by each driver — used to surface matched drivers first in
-// the assignment dropdowns (Section 6). Keywords are case-insensitive substrings
-// of the area values in the AREAS list above.
-export const DRIVER_COVERAGE: Record<string, string[]> = {
+// ── Managed driver store ─────────────────────────────────────────────────────
+// These mutable arrays are populated from the /api/drivers endpoint at startup
+// (see App.tsx → setManagedDriverList). Components that import DRIVERS,
+// DRIVER_ASSISTANTS, and DRIVER_COVERAGE get the live managed list.
+// Hardcoded defaults serve as fallback only when the API hasn't responded yet.
+
+const _DEFAULT_DRIVERS = ['Lando Navarro', 'Manny Santos', 'Ronald de la Cruz'];
+const _DEFAULT_ASSISTANTS = ['Jayson Reyes', 'Bong Alvarez', 'Ricky Mendoza'];
+const _DEFAULT_COVERAGE: Record<string, string[]> = {
   'Lando Navarro':      ['Makati', 'BGC', 'Taguig', 'Mandaluyong', 'San Juan', 'Pasig', 'Ortigas'],
   'Manny Santos':       ['Quezon City', 'Marikina', 'Caloocan', 'Valenzuela', 'Malabon', 'Bulacan', 'Cainta', 'Antipolo'],
   'Ronald de la Cruz':  ['Manila', 'Parañaque', 'Pasay', 'Las Piñas', 'Muntinlupa', 'Cavite', 'Laguna', 'Batangas'],
 };
+const _DEFAULT_COVERAGE_AREAS: Record<string, string[]> = {
+  'Lando Navarro':     ['North QC', 'Central QC / Manila', 'North Metro'],
+  'Manny Santos':      ['South Manila Belt', 'Ortigas Corridor'],
+  'Ronald de la Cruz': ['East Metro', 'Ortigas Corridor'],
+};
+
+let _managedDrivers: string[] | null = null;
+let _managedAssistants: string[] | null = null;
+let _managedCoverage: Record<string, string[]> | null = null;
+
+export interface ManagedDriver {
+  name: string;
+  type: 'DRIVER' | 'ASSISTANT';
+  coverage_areas: string[];
+  is_active: boolean;
+}
+
+export function setManagedDriverList(list: ManagedDriver[]) {
+  const active = list.filter(d => d.is_active);
+  _managedDrivers = active.filter(d => d.type === 'DRIVER').map(d => d.name);
+  _managedAssistants = active.filter(d => d.type === 'ASSISTANT').map(d => d.name);
+  const cov: Record<string, string[]> = {};
+  for (const d of active) {
+    if (d.coverage_areas.length > 0) cov[d.name] = d.coverage_areas;
+  }
+  _managedCoverage = cov;
+}
+
+export const DRIVERS: string[] = new Proxy([] as string[], {
+  get(_, prop) {
+    const src = _managedDrivers ?? _DEFAULT_DRIVERS;
+    return Reflect.get(src, prop);
+  },
+});
+
+export const DRIVER_ASSISTANTS: string[] = new Proxy([] as string[], {
+  get(_, prop) {
+    const src = _managedAssistants ?? _DEFAULT_ASSISTANTS;
+    return Reflect.get(src, prop);
+  },
+});
+
+export const DRIVER_COVERAGE: Record<string, string[]> = new Proxy({} as Record<string, string[]>, {
+  get(_, prop) {
+    const src = _managedCoverage ?? _DEFAULT_COVERAGE;
+    return Reflect.get(src, prop);
+  },
+  ownKeys() {
+    return Reflect.ownKeys(_managedCoverage ?? _DEFAULT_COVERAGE);
+  },
+  getOwnPropertyDescriptor(_, prop) {
+    const src = _managedCoverage ?? _DEFAULT_COVERAGE;
+    if (prop in src) return { configurable: true, enumerable: true, value: (src as any)[prop] };
+    return undefined;
+  },
+  has(_, prop) {
+    return prop in (_managedCoverage ?? _DEFAULT_COVERAGE);
+  },
+});
 
 // Proximity clusters — derived from AREA_HIERARCHY (subregion name → areas)
 export const AREA_CLUSTERS: Record<string, string[]> = Object.fromEntries(
   AREA_HIERARCHY.flatMap(r => r.subregions.map(s => [s.name, s.areas]))
 );
 
-// Driver coverage mapped to subregion names (used for optgroup matching in ActionsTab)
-export const DRIVER_COVERAGE_AREAS: Record<string, string[]> = {
-  'Lando Navarro':     ['North QC', 'Central QC / Manila', 'North Metro'],
-  'Manny Santos':      ['South Manila Belt', 'Ortigas Corridor'],
-  'Ronald de la Cruz': ['East Metro', 'Ortigas Corridor'],
-};
+export const DRIVER_COVERAGE_AREAS: Record<string, string[]> = new Proxy({} as Record<string, string[]>, {
+  get(_, prop) {
+    const src = _managedCoverage ?? _DEFAULT_COVERAGE_AREAS;
+    return Reflect.get(src, prop);
+  },
+  ownKeys() {
+    return Reflect.ownKeys(_managedCoverage ?? _DEFAULT_COVERAGE_AREAS);
+  },
+  getOwnPropertyDescriptor(_, prop) {
+    const src = _managedCoverage ?? _DEFAULT_COVERAGE_AREAS;
+    if (prop in src) return { configurable: true, enumerable: true, value: (src as any)[prop] };
+    return undefined;
+  },
+  has(_, prop) {
+    return prop in (_managedCoverage ?? _DEFAULT_COVERAGE_AREAS);
+  },
+});
 
 // 1. Products (POS Hardware & Accessories - 20 items)
 export const initialProducts: Product[] = [

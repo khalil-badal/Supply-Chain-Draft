@@ -94,6 +94,18 @@ export interface ApiSupplier {
   modified_at: string;
 }
 
+export interface ApiDriver {
+  id: string;
+  name: string;
+  type: 'DRIVER' | 'ASSISTANT';
+  coverage_areas: string[];
+  is_active: boolean;
+  created_by: string;
+  created_at: string;
+  modified_by: string;
+  modified_at: string;
+}
+
 export type ApiDashboardStats =
   | {
       role: 'SALES_COORDINATOR';
@@ -463,5 +475,14 @@ export const api = {
     return request<{ rows: { date: string; category: string; status: string; count: number }[]; source?: 'snapshot' | 'live' }>(
       `/reports/daily-status-history?${qs.toString()}`
     );
-  }
+  },
+
+  // Driver Manager
+  getDrivers: (all?: boolean) => request<ApiDriver[]>(`/drivers${all ? '?all=1' : ''}`),
+  createDriver: (data: { name: string; type: 'DRIVER' | 'ASSISTANT'; coverage_areas?: string[] }) =>
+    request<ApiDriver>('/drivers', { method: 'POST', body: JSON.stringify(data) }),
+  updateDriver: (id: string, data: Partial<{ name: string; type: string; coverage_areas: string[]; is_active: boolean }>) =>
+    request<ApiDriver>(`/drivers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteDriver: (id: string) =>
+    request<void>(`/drivers/${id}`, { method: 'DELETE' }),
 };

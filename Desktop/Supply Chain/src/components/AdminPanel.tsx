@@ -15,7 +15,7 @@ const ROLE_LABELS: Record<string, string> = {
 const ALL_SCREENS = [
   'main', 'dashboard', 'deliveries', 'rma', 'accounting_collection',
   'procurement_pickup', 'sales_orders', 'customers', 'suppliers',
-  'driver', 'calendar', 'driver_board', 'am_directory',
+  'driver', 'driver_manager', 'calendar', 'driver_board', 'am_directory',
   'transactions', 'inventory', 'data_sampler', 'admin'
 ] as const;
 
@@ -30,6 +30,7 @@ const SCREEN_LABELS: Record<string, string> = {
   customers: 'Customers',
   suppliers: 'Suppliers',
   driver: 'Driver View',
+  driver_manager: 'Driver Manager',
   calendar: 'Delivery Calendar',
   driver_board: 'Driver Board',
   am_directory: 'AM Directory',
@@ -41,9 +42,9 @@ const SCREEN_LABELS: Record<string, string> = {
 
 const ROLE_DEFAULT_SCREENS: Record<string, string[]> = {
   SALES_COORDINATOR: ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'am_directory', 'transactions', 'inventory'],
-  LOGISTICS:         ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'driver', 'calendar', 'driver_board', 'transactions', 'inventory'],
+  LOGISTICS:         ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'driver', 'driver_manager', 'calendar', 'driver_board', 'transactions', 'inventory'],
   TASS:              ['main', 'dashboard', 'accounting_collection', 'transactions'],
-  ADMIN:             ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'driver', 'admin', 'calendar', 'driver_board', 'am_directory', 'transactions', 'inventory', 'data_sampler'],
+  ADMIN:             ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'driver', 'driver_manager', 'admin', 'calendar', 'driver_board', 'am_directory', 'transactions', 'inventory', 'data_sampler'],
 };
 
 interface PermissionsPanelProps {

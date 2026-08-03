@@ -22,6 +22,7 @@ import notificationsRoutes from './routes/notifications';
 import devRoutes from './routes/dev';
 import dataSamplerRoutes from './routes/data-sampler';
 import reportsRoutes from './routes/reports';
+import driversRoutes from './routes/drivers';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -68,6 +69,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/dev', devRoutes);
 app.use('/api/data-sampler', dataSamplerRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/drivers', driversRoutes);
 
 // In production, serve the built Vite frontend and handle client-side routing
 // by falling back to index.html for any non-API route.

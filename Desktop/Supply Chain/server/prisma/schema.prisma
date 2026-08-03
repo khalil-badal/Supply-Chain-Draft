@@ -242,6 +242,21 @@ model RemarkLog {
   createdAt DateTime @default(now())
 }
 
+// Managed driver directory — replaces the hardcoded DRIVERS / DRIVER_ASSISTANTS
+// arrays in data.ts. Drivers and assistants managed here propagate to every
+// assignment dropdown, dispatch board, and report across the portal.
+model Driver {
+  id            String   @id @default(cuid())
+  name          String
+  type          String   // DRIVER | ASSISTANT
+  coverageAreas String   @default("[]") // JSON string[] of area keywords
+  isActive      Boolean  @default(true)
+  createdBy     String
+  createdAt     DateTime @default(now())
+  modifiedBy    String
+  modifiedAt    DateTime @updatedAt
+}
+
 model DailyStatusSnapshot {
   id        String   @id @default(cuid())
   date      String   // YYYY-MM-DD — the day this snapshot represents

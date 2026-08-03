@@ -48,7 +48,8 @@ import {
 import { DEFAULT_OUTPUT_ACTIONS } from './outputActions';
 import { loadState, saveState } from './persistence';
 import { CATEGORY_SCREENS } from './screenRouting';
-import { api, ApiUser, ApiCompany, ApiCustomer, ApiSupplier, ApiDashboardStats, ApiSku, ApiError } from './api';
+import { setManagedDriverList } from './data';
+import { api, ApiUser, ApiCompany, ApiCustomer, ApiSupplier, ApiDriver, ApiDashboardStats, ApiSku, ApiError } from './api';
 
 // Import Screens
 import DashboardView from './components/DashboardView';
@@ -72,6 +73,7 @@ import MainView from './components/MainView';
 import DriverDashboard from './components/DriverDashboard';
 import StatusHistoryView from './components/StatusHistoryView';
 import StatisticalReportView from './components/StatisticalReportView';
+import DriverManagerView from './components/DriverManagerView';
 
 // Maps the real DB role (SALES_COORDINATOR | LOGISTICS | TASS | ADMIN) to the
 // display-friendly UserRole labels the rest of the frontend already uses.
@@ -133,6 +135,7 @@ export default function App() {
   const [suppliers, setSuppliers] = useState<ApiSupplier[]>([]);
   const [dashboardStats, setDashboardStats] = useState<ApiDashboardStats | null>(null);
   const [products, setProducts] = useState<ApiSku[]>([]);
+  const [managedDrivers, setManagedDrivers] = useState<ApiDriver[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
 
@@ -140,13 +143,14 @@ export default function App() {
     setDataLoading(true);
     setDataError(null);
     try {
-      const [records, companyList, customerList, supplierList, stats, skuList] = await Promise.all([
+      const [records, companyList, customerList, supplierList, stats, skuList, driverList] = await Promise.all([
         api.getRecords(),
         api.getCompanies(),
         api.getCustomers(),
         api.getSuppliers(),
         api.getDashboardStats(),
-        api.getSkus()
+        api.getSkus(),
+        api.getDrivers(true),
       ]);
       setDeliveryRecords(records.map(normalizeApiRecord));
       setCompanies(companyList);
@@ -154,6 +158,13 @@ export default function App() {
       setSuppliers(supplierList);
       setDashboardStats(stats);
       setProducts(skuList);
+      setManagedDrivers(driverList);
+      setManagedDriverList(driverList.map(d => ({
+        name: d.name,
+        type: d.type,
+        coverage_areas: d.coverage_areas,
+        is_active: d.is_active,
+      })));
     } catch (err) {
       setDataError(err instanceof ApiError ? err.message : 'Failed to load data from the server.');
     } finally {
@@ -174,6 +185,7 @@ export default function App() {
     setSuppliers([]);
     setDashboardStats(null);
     setProducts([]);
+    setManagedDrivers([]);
   };
 
   const handleCreateCustomer = async (data: { name: string; contact_person?: string; email?: string; phone?: string; address?: string; city?: string }) => {
@@ -191,6 +203,33 @@ export default function App() {
       await refreshData();
     } catch (err) {
       setDataError(err instanceof ApiError ? err.message : 'Failed to create supplier.');
+    }
+  };
+
+  const handleCreateDriver = async (data: { name: string; type: 'DRIVER' | 'ASSISTANT'; coverage_areas?: string[] }) => {
+    try {
+      await api.createDriver(data);
+      await refreshData();
+    } catch (err) {
+      setDataError(err instanceof ApiError ? err.message : 'Failed to create driver.');
+    }
+  };
+
+  const handleUpdateDriver = async (id: string, data: Partial<{ name: string; type: string; coverage_areas: string[]; is_active: boolean }>) => {
+    try {
+      await api.updateDriver(id, data);
+      await refreshData();
+    } catch (err) {
+      setDataError(err instanceof ApiError ? err.message : 'Failed to update driver.');
+    }
+  };
+
+  const handleDeleteDriver = async (id: string) => {
+    try {
+      await api.deleteDriver(id);
+      await refreshData();
+    } catch (err) {
+      setDataError(err instanceof ApiError ? err.message : 'Failed to delete driver.');
     }
   };
 
@@ -252,9 +291,9 @@ export default function App() {
   // Role scope: which screens each role can access (default baseline)
   const DEFAULT_ROLE_SCOPE: Record<string, string[]> = {
     'Sales Coordinator': ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'am_directory', 'transactions', 'inventory'],
-    'Logistics':         ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'driver', 'calendar', 'driver_board', 'transactions', 'inventory', 'status_history', 'statistical_reports'],
+    'Logistics':         ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'driver', 'driver_manager', 'calendar', 'driver_board', 'transactions', 'inventory', 'status_history', 'statistical_reports'],
     'TASS':              ['main', 'dashboard', 'rma', 'procurement_pickup', 'accounting_collection', 'transactions', 'inventory', 'suppliers'],
-    'Admin':             ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'driver', 'admin', 'calendar', 'driver_board', 'am_directory', 'transactions', 'inventory', 'data_sampler', 'status_history', 'statistical_reports'],
+    'Admin':             ['main', 'dashboard', 'deliveries', 'rma', 'accounting_collection', 'procurement_pickup', 'sales_orders', 'customers', 'suppliers', 'driver', 'driver_manager', 'admin', 'calendar', 'driver_board', 'am_directory', 'transactions', 'inventory', 'data_sampler', 'status_history', 'statistical_reports'],
     'Driver':            ['driver_dashboard'],
   };
 
@@ -508,6 +547,17 @@ export default function App() {
             currentUserName={currentUser.name}
             outputActionConfigs={outputActionConfigs}
             onNavigate={handleNavigate}
+          />
+        );
+      case 'driver_manager':
+        return (
+          <DriverManagerView
+            drivers={managedDrivers}
+            currentUserRole={currentUserRole}
+            currentUserName={currentUser.name}
+            onCreateDriver={handleCreateDriver}
+            onUpdateDriver={handleUpdateDriver}
+            onDeleteDriver={handleDeleteDriver}
           />
         );
       case 'suppliers':
@@ -844,12 +894,22 @@ export default function App() {
               </span>
             </button>
 
-            {/* 8. Driver View - a Logistics tool for managing driver-side ops, not a separate login */}
-            {currentUserRole === 'Logistics' && (
+            {/* 8. Driver View — Logistics + Admin */}
+            {canAccess('driver') && (
               <button onClick={() => handleNavigate('driver')} title={isSidebarCollapsed ? 'Driver View' : ''} className={navItemClass('driver')}>
                 <span className={`flex items-center ${isSidebarCollapsed ? '' : 'space-x-3'}`}>
                   <Smartphone className="w-5 h-5 shrink-0" />
                   {!isSidebarCollapsed && <span className="text-xs font-medium truncate">Driver View</span>}
+                </span>
+              </button>
+            )}
+
+            {/* Driver Manager — Logistics + Admin */}
+            {canAccess('driver_manager') && (
+              <button onClick={() => handleNavigate('driver_manager')} title={isSidebarCollapsed ? 'Driver Manager' : ''} className={navItemClass('driver_manager')}>
+                <span className={`flex items-center ${isSidebarCollapsed ? '' : 'space-x-3'}`}>
+                  <UsersRound className="w-5 h-5 shrink-0" />
+                  {!isSidebarCollapsed && <span className="text-xs font-medium truncate">Driver Manager</span>}
                 </span>
               </button>
             )}
