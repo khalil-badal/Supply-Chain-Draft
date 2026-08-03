@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Plus, Search, X, Check, FileText, UploadCloud,
-  Loader2, Wand2
+  Loader2, Wand2, SlidersHorizontal
 } from 'lucide-react';
 import ExportMenu from './ExportMenu';
 import AccountManagerCombobox from './AccountManagerCombobox';
@@ -116,6 +116,7 @@ export default function AccountingCollectionView({
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [dateSort, setDateSort] = useState<'default' | 'nearest' | 'oldest' | 'furthest'>('default');
   const [amFilter, setAmFilter] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [form, setForm] = useState<RecordFormState>(buildEmptyForm());
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [attachmentNames, setAttachmentNames] = useState<string[]>([]);
@@ -559,73 +560,90 @@ export default function AccountingCollectionView({
       {!showForm && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
           {/* Toolbar */}
-          <div className="p-4 border-b border-slate-200 space-y-3">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Accounting Collection Registry</h4>
-                <p className="text-[11px] text-slate-400">{sortedFiltered.length} of {records.length} records shown</p>
+          <div className="p-4 border-b border-slate-200 space-y-0">
+            {/* ── Primary toolbar bar ── */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              {/* LEFT: category label + status chips */}
+              <div className="flex items-center gap-0 min-w-0 flex-wrap">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wider mr-3 shrink-0">Accounting Collection</span>
+                <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3 flex-wrap">
+                  {['All', 'Scheduled', 'Pending', 'Delivered', 'On-Hold', 'Rescheduled'].map(s => (
+                    <button
+                      key={s}
+                      onClick={() => setStatusFilter(s)}
+                      className={`px-3 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
+                        statusFilter === s
+                          ? 'bg-[#1F3864] text-white border-[#1F3864]'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                      }`}
+                    >
+                      {s === 'All' ? 'All' : acStatusLabel(s)}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="relative w-full sm:w-64">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Search by ID, company, reference..."
-                  className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#0078C1]"
-                />
+
+              {/* RIGHT: search + filter toggle + record count */}
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="relative w-56">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search by ID, company, reference..."
+                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#0078C1]"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowAdvancedFilters(v => !v)}
+                  className={`relative p-2 rounded-lg border transition-all cursor-pointer ${showAdvancedFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'}`}
+                  title="Toggle advanced filters"
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                  {(!!amFilter || dateSort !== 'default') && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white" />
+                  )}
+                </button>
+                <span className="text-[11px] font-bold text-slate-400 tabular-nums shrink-0">{sortedFiltered.length}</span>
               </div>
             </div>
 
-            {/* Status filter chips — value is the real underlying DeliveryStatus,
-                label is the Accounting-Collection-specific display text */}
-            {/* Row 1: Status chips + Account Manager */}
-            <div className="flex flex-wrap gap-2 items-center">
-              {['All', 'Scheduled', 'Pending', 'Delivered', 'On-Hold', 'Rescheduled'].map(s => (
-                <button
-                  key={s}
-                  onClick={() => setStatusFilter(s)}
-                  className={`px-3 py-1 rounded-lg text-[11px] font-semibold border transition-all ${
-                    statusFilter === s
-                      ? 'bg-[#1F3864] text-white border-[#1F3864]'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
-                  }`}
-                >
-                  {s === 'All' ? 'All' : acStatusLabel(s)}
-                </button>
-              ))}
-              <div className="flex flex-col gap-0.5 ml-1 border-l border-slate-200 pl-3">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider leading-none">Account Manager</span>
+            {/* ── Collapsible Advanced Filters ── */}
+            {showAdvancedFilters && (
+              <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-end gap-3">
+                {/* Account Manager */}
                 <AccountManagerCombobox
                   value={amFilter}
                   onChange={setAmFilter}
                   options={amOptions}
-                  inputClassName="text-sm font-semibold border-2 border-slate-300 bg-white text-slate-800 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0078C1] focus:border-[#0078C1] w-44 placeholder:text-slate-400"
+                  placeholder="Account Manager"
+                  inputClassName="text-[11px] font-semibold border border-slate-200 rounded-lg px-2 py-1.5 w-40 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0078C1] placeholder:text-slate-400"
                 />
-              </div>
-            </div>
 
-            {/* Row 2: Date sort + Clear */}
-            <div className="flex flex-wrap gap-2 items-center pt-1">
-              <select
-                value={dateSort}
-                onChange={e => setDateSort(e.target.value as typeof dateSort)}
-                className="px-2 py-1 border border-slate-300 rounded-lg text-[11px] font-semibold text-slate-600 bg-white cursor-pointer"
-              >
-                <option value="default">Sort: Default</option>
-                <option value="nearest">Sort: Nearest to Present</option>
-                <option value="oldest">Sort: Oldest First</option>
-                <option value="furthest">Sort: Furthest Future First</option>
-              </select>
-              {(searchQuery || statusFilter !== 'All' || amFilter || dateSort !== 'default') && (
-                <button
-                  onClick={() => { setSearchQuery(''); setStatusFilter('All'); setAmFilter(''); setDateSort('default'); }}
-                  className="px-3 py-1 text-[#1F3864] hover:underline font-bold text-[10px] uppercase"
+                {/* Date sort */}
+                <select
+                  value={dateSort}
+                  onChange={e => setDateSort(e.target.value as typeof dateSort)}
+                  className="text-[11px] font-semibold border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#0078C1]"
                 >
-                  Clear
-                </button>
-              )}
-            </div>
+                  <option value="default">Sort: Default</option>
+                  <option value="nearest">Sort: Nearest to Present</option>
+                  <option value="oldest">Sort: Oldest First</option>
+                  <option value="furthest">Sort: Furthest Future First</option>
+                </select>
+
+                {/* Clear all */}
+                {(searchQuery || statusFilter !== 'All' || amFilter || dateSort !== 'default') && (
+                  <button
+                    onClick={() => { setSearchQuery(''); setStatusFilter('All'); setAmFilter(''); setDateSort('default'); }}
+                    className="px-3 py-1.5 text-[#1F3864] hover:underline font-bold text-[10px] uppercase cursor-pointer"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Table */}

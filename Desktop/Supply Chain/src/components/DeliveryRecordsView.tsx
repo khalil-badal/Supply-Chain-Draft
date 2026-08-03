@@ -24,7 +24,7 @@ import { DELIVERY_COLUMNS, AC_EXTRA_COLUMNS, PDF_DELIVERY_COLUMNS, PDF_AC_COLUMN
 import { DeliveryRecord, DeliveryCategory, UserRole, DeliveryStatus, OutputActionConfig, OutputActionTrigger } from '../types';
 import { ApiCompany, api, ApiError } from '../api';
 import { DELIVERY_STATUSES, AREA_HIERARCHY, getRegion, getSubregion } from '../data';
-import { MapPin } from 'lucide-react';
+import { MapPin, SlidersHorizontal } from 'lucide-react';
 import DeliveryRecordWorkspace from './DeliveryRecordWorkspace';
 import RecordCreateForm from './RecordCreateForm';
 
@@ -96,6 +96,7 @@ export default function DeliveryRecordsView({
   const [amFilter, setAmFilter] = useState('');
   const [driverFilter, setDriverFilter] = useState('');
   const dateFromRef = useRef<HTMLInputElement>(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [creationBanner, setCreationBanner] = useState<{ recordId: string; lines: string[] } | null>(null);
 
 
@@ -360,6 +361,8 @@ export default function DeliveryRecordsView({
     : undefined;
 
   const showTassFilters = currentUserRole === 'TASS';
+
+  const hasAdvancedFilters = regionFilter !== 'All Regions' || subregionFilter !== 'All Subregions' || areaFilter !== 'All Areas' || !!amFilter || !!driverFilter || !!dateFrom || !!dateTo || dateSort !== 'default';
 
   const showCheckbox = canAssignDriver || canEdit;
   const showCollectionCol = currentUserRole === 'TASS' && category === 'Accounting Collection';
@@ -649,43 +652,60 @@ export default function DeliveryRecordsView({
         <div className="grid grid-cols-1 gap-6 items-start">
           {/* List — full width, no drawer */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm lg:col-span-3">
-            <div className="p-4 border-b border-slate-200 space-y-3 print:hidden">
+            <div className="p-4 border-b border-slate-200 space-y-0 print:hidden">
+              {/* ── Primary toolbar bar ── */}
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">{category} Registry</h4>
-                  <p className="text-[11px] text-slate-400">{sortedFiltered.length} of {records.filter(r => r.category === category).length} records shown — no threshold cap applies</p>
+                {/* LEFT: category label + status chips */}
+                <div className="flex items-center gap-0 min-w-0 flex-wrap">
+                  <span className="text-xs font-black text-slate-800 uppercase tracking-wider mr-3 shrink-0">{category}</span>
+                  <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3 flex-wrap">
+                    {['All', ...DELIVERY_STATUSES].map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setStatusFilter(s)}
+                        className={`px-3 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
+                          statusFilter === s
+                            ? 'bg-[#1F3864] text-white border-[#1F3864]'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="relative w-full sm:w-64">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search records..."
-                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-[#0078C1]" />
+
+                {/* RIGHT: search + filter toggle + record count */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="relative w-56">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search records..."
+                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-hidden focus:ring-1 focus:ring-[#0078C1]" />
+                  </div>
+                  <button
+                    onClick={() => setShowAdvancedFilters(v => !v)}
+                    className={`relative p-2 rounded-lg border transition-all cursor-pointer ${showAdvancedFilters ? 'bg-blue-50 border-blue-300 text-blue-700' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'}`}
+                    title="Toggle advanced filters"
+                  >
+                    <SlidersHorizontal className="w-4 h-4" />
+                    {hasAdvancedFilters && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white" />
+                    )}
+                  </button>
+                  <span className="text-[11px] font-bold text-slate-400 tabular-nums shrink-0">{sortedFiltered.length}</span>
                 </div>
               </div>
 
-              {/* Status/Area (left) + AM/Driver/Dates column (right) */}
-              <div className="flex flex-wrap items-start gap-3">
-
-                {/* Left: status chips + area filters */}
-                <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-                  {['All', ...DELIVERY_STATUSES].map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setStatusFilter(s)}
-                      className={`px-3 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
-                        statusFilter === s
-                          ? 'bg-[#1F3864] text-white border-[#1F3864]'
-                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                  <div className="flex items-center gap-1.5 ml-1 border-l border-slate-200 pl-3 flex-wrap">
+              {/* ── Collapsible Advanced Filters ── */}
+              {showAdvancedFilters && (
+                <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-end gap-3">
+                  {/* Geo filters */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <select
                       value={regionFilter}
                       onChange={e => { setRegionFilter(e.target.value); setSubregionFilter('All Subregions'); setAreaFilter('All Areas'); }}
-                      className="text-[11px] font-semibold border border-slate-200 bg-white text-slate-700 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0078C1] cursor-pointer"
+                      className="text-[11px] font-semibold border border-slate-200 rounded-lg px-2 py-1.5 w-40 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0078C1] cursor-pointer"
                     >
                       <option value="All Regions">All Regions</option>
                       {AREA_HIERARCHY.map(r => <option key={r.region} value={r.region}>{r.region}</option>)}
@@ -693,7 +713,7 @@ export default function DeliveryRecordsView({
                     <select
                       value={subregionFilter}
                       onChange={e => { setSubregionFilter(e.target.value); setAreaFilter('All Areas'); }}
-                      className="text-[11px] font-semibold border border-slate-200 bg-white text-slate-700 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0078C1] cursor-pointer"
+                      className="text-[11px] font-semibold border border-slate-200 rounded-lg px-2 py-1.5 w-40 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0078C1] cursor-pointer"
                     >
                       <option value="All Subregions">All Subregions</option>
                       {(regionFilter === 'All Regions' ? AREA_HIERARCHY : AREA_HIERARCHY.filter(r => r.region === regionFilter))
@@ -703,47 +723,39 @@ export default function DeliveryRecordsView({
                     <select
                       value={areaFilter}
                       onChange={e => setAreaFilter(e.target.value)}
-                      className="text-[11px] font-semibold border border-slate-200 bg-white text-slate-700 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0078C1] cursor-pointer"
+                      className="text-[11px] font-semibold border border-slate-200 rounded-lg px-2 py-1.5 w-40 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0078C1] cursor-pointer"
                     >
                       {distinctAreasForFilter.map(a => <option key={a} value={a}>{a}</option>)}
                     </select>
                   </div>
-                </div>
 
-                {/* Right: AM + Driver on top, dates directly below */}
-                <div className="flex flex-col gap-1.5 border-l border-slate-200 pl-3 shrink-0">
-                  {/* AM + Driver */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider leading-none">Account Manager</span>
-                      <AccountManagerCombobox
-                        value={amFilter}
-                        onChange={setAmFilter}
-                        options={amOptions}
-                        inputClassName="text-sm font-semibold border-2 border-slate-300 bg-white text-slate-800 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0078C1] focus:border-[#0078C1] w-44 placeholder:text-slate-400"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider leading-none">Driver</span>
-                      <AccountManagerCombobox
-                        value={driverFilter}
-                        onChange={setDriverFilter}
-                        options={driverOptions}
-                        placeholder="Driver"
-                        inputClassName="text-sm font-semibold border-2 border-slate-300 bg-white text-slate-800 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0078C1] focus:border-[#0078C1] w-40 placeholder:text-slate-400"
-                      />
-                    </div>
+                  {/* AM + Driver comboboxes */}
+                  <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+                    <AccountManagerCombobox
+                      value={amFilter}
+                      onChange={setAmFilter}
+                      options={amOptions}
+                      placeholder="Account Manager"
+                      inputClassName="text-[11px] font-semibold border border-slate-200 rounded-lg px-2 py-1.5 w-40 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0078C1] placeholder:text-slate-400"
+                    />
+                    <AccountManagerCombobox
+                      value={driverFilter}
+                      onChange={setDriverFilter}
+                      options={driverOptions}
+                      placeholder="Driver"
+                      inputClassName="text-[11px] font-semibold border border-slate-200 rounded-lg px-2 py-1.5 w-40 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0078C1] placeholder:text-slate-400"
+                    />
                   </div>
 
-                  {/* Dates — directly below AM + Driver */}
-                  <div className="flex items-center gap-1.5">
+                  {/* Date range + sort */}
+                  <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
                     <input
                       ref={dateFromRef}
                       type="date"
                       value={dateFrom}
                       onChange={e => setDateFrom(e.target.value)}
                       title="Date from"
-                      className="text-[11px] font-semibold border border-slate-200 bg-white text-slate-700 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0078C1] cursor-pointer"
+                      className="text-[11px] font-semibold border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0078C1] cursor-pointer"
                     />
                     <span className="text-[11px] text-slate-400 font-semibold">—</span>
                     <input
@@ -751,7 +763,7 @@ export default function DeliveryRecordsView({
                       value={dateTo}
                       onChange={e => setDateTo(e.target.value)}
                       title="Date to"
-                      className="text-[11px] font-semibold border border-slate-200 bg-white text-slate-700 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0078C1] cursor-pointer"
+                      className="text-[11px] font-semibold border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#0078C1] cursor-pointer"
                     />
                     {(dateFrom || dateTo) && (
                       <button
@@ -767,7 +779,7 @@ export default function DeliveryRecordsView({
                       onChange={e => setDateSort(e.target.value as typeof dateSort)}
                       disabled={!!(dateFrom || dateTo)}
                       title={(dateFrom || dateTo) ? 'Sort order is N/A while a date range filter is active' : undefined}
-                      className={`text-[11px] font-semibold border rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#0078C1] ${(dateFrom || dateTo) ? 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed' : 'border-slate-200 bg-white text-slate-700 cursor-pointer'}`}
+                      className={`text-[11px] font-semibold border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#0078C1] ${(dateFrom || dateTo) ? 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed' : 'border-slate-200 bg-white text-slate-700 cursor-pointer'}`}
                     >
                       {(dateFrom || dateTo) && <option value={dateSort}>Sort: N/A</option>}
                       <option value="default">Date: Default</option>
@@ -775,18 +787,19 @@ export default function DeliveryRecordsView({
                       <option value="oldest">Oldest First</option>
                       <option value="furthest">Furthest Future First</option>
                     </select>
-                    {(searchQuery || statusFilter !== 'All' || regionFilter !== 'All Regions' || subregionFilter !== 'All Subregions' || areaFilter !== 'All Areas' || amFilter || driverFilter || dateFrom || dateTo || dateSort !== 'default') && (
-                      <button
-                        onClick={() => { setSearchQuery(''); setStatusFilter('All'); setRegionFilter('All Regions'); setSubregionFilter('All Subregions'); setAreaFilter('All Areas'); setAmFilter(''); setDriverFilter(''); setDateFrom(''); setDateTo(''); setDateSort('default'); }}
-                        className="px-3 py-1 text-[#1F3864] hover:underline font-bold text-[10px] uppercase cursor-pointer"
-                      >
-                        Clear
-                      </button>
-                    )}
                   </div>
-                </div>
 
-              </div>
+                  {/* Clear all */}
+                  {(searchQuery || statusFilter !== 'All' || hasAdvancedFilters) && (
+                    <button
+                      onClick={() => { setSearchQuery(''); setStatusFilter('All'); setRegionFilter('All Regions'); setSubregionFilter('All Subregions'); setAreaFilter('All Areas'); setAmFilter(''); setDriverFilter(''); setDateFrom(''); setDateTo(''); setDateSort('default'); }}
+                      className="px-3 py-1.5 text-[#1F3864] hover:underline font-bold text-[10px] uppercase cursor-pointer"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="overflow-x-auto">
