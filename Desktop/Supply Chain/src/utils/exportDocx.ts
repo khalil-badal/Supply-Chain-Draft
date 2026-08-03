@@ -3,7 +3,7 @@
  * Uses the `docx` npm package (browser-compatible via dynamic import).
  */
 
-import type { ExportColumn, ExportMeta } from './export';
+import type { ExportColumn, ExportMeta, StatusHistoryCounts } from './export';
 import type { AllOpsSummary } from './allOpsExport';
 
 // A4 landscape content width in twips (16838 − 2×720 margins)
@@ -22,6 +22,16 @@ function cellBorders(color?: string, size?: number) {
 
 // ─── Main download function ───────────────────────────────────────────────────
 
+const STATUS_ORDER = ['Scheduled', 'Delivered', 'Pending', 'On-Hold', 'Rescheduled'] as const;
+
+const STATUS_COLORS: Record<string, string> = {
+  'Scheduled':   '2563EB',
+  'Delivered':   '059669',
+  'Pending':     'D97706',
+  'On-Hold':     'DC2626',
+  'Rescheduled': '7C3AED',
+};
+
 export async function downloadDocx(
   rows:         Record<string, string | number | null | undefined>[],
   columns:      ExportColumn[],
@@ -30,6 +40,7 @@ export async function downloadDocx(
   meta:         ExportMeta,
   summary?:     AllOpsSummary,
   summaryTitle?: string,
+  statusHistoryCounts?: StatusHistoryCounts,
 ): Promise<void> {
   const {
     Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun,
@@ -76,6 +87,100 @@ export async function downloadDocx(
       ),
     }),
   );
+
+  // ── Status History Summary table ────────────────────────────────────────────
+  const historyChildren: (InstanceType<typeof Paragraph> | InstanceType<typeof Table>)[] = [];
+  if (statusHistoryCounts) {
+    historyChildren.push(
+      new Paragraph({
+        children: [new TextRun({ text: 'STATUS HISTORY SUMMARY', bold: true, size: 22, color: '1F3864' })],
+        spacing: { before: 120, after: 80 },
+      }),
+    );
+
+    const histColW = [4000, 3200, 3200];
+    const histHdrRow = new TableRow({
+      tableHeader: true,
+      children: ['Status', 'Ever Held', 'Current Status'].map((h, i) =>
+        new TableCell({
+          shading: { fill: '1F3864' },
+          borders: cellBorders('1F3864', 2),
+          width: { size: histColW[i], type: WidthType.DXA },
+          children: [new Paragraph({
+            alignment: i === 0 ? AlignmentType.LEFT : AlignmentType.CENTER,
+            children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })],
+          })],
+        }),
+      ),
+    });
+
+    const histDataRows = STATUS_ORDER.map((s, idx) =>
+      new TableRow({
+        children: [
+          new TableCell({
+            shading: idx % 2 === 1 ? { fill: 'F8F9FA' } : undefined,
+            borders: cellBorders(),
+            width: { size: histColW[0], type: WidthType.DXA },
+            children: [new Paragraph({
+              children: [new TextRun({ text: s, bold: true, color: STATUS_COLORS[s] ?? '1F3864', size: 18 })],
+            })],
+          }),
+          new TableCell({
+            shading: idx % 2 === 1 ? { fill: 'F8F9FA' } : undefined,
+            borders: cellBorders(),
+            width: { size: histColW[1], type: WidthType.DXA },
+            children: [new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [new TextRun({ text: String(statusHistoryCounts.ever_held[s] ?? 0), size: 18 })],
+            })],
+          }),
+          new TableCell({
+            shading: idx % 2 === 1 ? { fill: 'F8F9FA' } : undefined,
+            borders: cellBorders(),
+            width: { size: histColW[2], type: WidthType.DXA },
+            children: [new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [new TextRun({ text: String(statusHistoryCounts.current[s] ?? 0), size: 18 })],
+            })],
+          }),
+        ],
+      }),
+    );
+
+    const histTotalRow = new TableRow({
+      children: [
+        new TableCell({
+          shading: { fill: 'EEF2FF' }, borders: cellBorders(),
+          width: { size: histColW[0], type: WidthType.DXA },
+          children: [new Paragraph({ children: [new TextRun({ text: 'Total Records', bold: true, size: 18, color: '1F3864' })] })],
+        }),
+        new TableCell({
+          shading: { fill: 'EEF2FF' }, borders: cellBorders(),
+          width: { size: histColW[1], type: WidthType.DXA },
+          children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(statusHistoryCounts.total_records), bold: true, size: 18 })] })],
+        }),
+        new TableCell({
+          shading: { fill: 'EEF2FF' }, borders: cellBorders(),
+          width: { size: histColW[2], type: WidthType.DXA },
+          children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: String(statusHistoryCounts.total_records), bold: true, size: 18 })] })],
+        }),
+      ],
+    });
+
+    historyChildren.push(
+      new Table({
+        width: { size: 10400, type: WidthType.DXA },
+        rows: [histHdrRow, ...histDataRows, histTotalRow],
+      }),
+      new Paragraph({
+        children: [new TextRun({
+          text: '* Ever Held counts may exceed total records as one record can pass through multiple statuses over its lifetime.',
+          italics: true, size: 14, color: '64748B',
+        })],
+        spacing: { before: 40, after: 120 },
+      }),
+    );
+  }
 
   // ── Summary section (AllOps only) ──────────────────────────────────────────
   const summaryChildren: InstanceType<typeof Paragraph>[] = [];
@@ -159,6 +264,9 @@ export async function downloadDocx(
           })],
           spacing: { after: 160 },
         }),
+
+        // Status history summary
+        ...historyChildren,
 
         // Optional summary
         ...summaryChildren,

@@ -30,6 +30,22 @@ export interface StatusHistoryCounts {
   total_records: number;
 }
 
+export function computeStatusHistoryCounts(
+  records: { id: string; status: string }[],
+  auditSets: Map<string, Set<string>>,
+): StatusHistoryCounts {
+  const ever_held: Record<string, number> = {};
+  const current: Record<string, number> = {};
+  for (const r of records) {
+    current[r.status] = (current[r.status] ?? 0) + 1;
+    const held = auditSets.get(r.id) ?? new Set([r.status]);
+    for (const s of held) {
+      ever_held[s] = (ever_held[s] ?? 0) + 1;
+    }
+  }
+  return { ever_held, current, total_records: records.length };
+}
+
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
 export function fmtDate(s: string | null | undefined): string {

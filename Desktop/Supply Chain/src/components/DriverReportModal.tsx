@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
-import { X, FileBarChart2, Loader2 } from 'lucide-react';
+import { X, FileBarChart2, Loader2, Clock, History } from 'lucide-react';
 import { DeliveryRecord } from '../types';
 import { downloadDriverReport } from '../utils/exportDriverReport';
+import { fetchHistoricStatusSets } from '../utils/routeSlip';
 
 interface Props {
   records: DeliveryRecord[];
@@ -31,23 +32,34 @@ function deriveDefaultMonthYear(records: DeliveryRecord[]): { month: number; yea
 
 export default function DriverReportModal({ records, onClose, generatedByName, generatedByRole }: Props) {
   const defaultMY = useMemo(() => deriveDefaultMonthYear(records), [records]);
-  const [month, setMonth]   = useState(defaultMY.month);
-  const [year, setYear]     = useState(defaultMY.year);
-  const [format, setFormat] = useState<'excel' | 'pdf' | 'docx' | 'csv'>('excel');
-  const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState<string | null>(null);
+  const [month, setMonth]       = useState(defaultMY.month);
+  const [year, setYear]         = useState(defaultMY.year);
+  const [format, setFormat]     = useState<'excel' | 'pdf' | 'docx' | 'csv'>('excel');
+  const [statusMode, setStatusMode] = useState<'current' | 'trail'>('current');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
 
-  const filteredCount = useMemo(() => records.filter(r => {
+  const filteredRecords = useMemo(() => records.filter(r => {
     if (!r.delivery_date) return false;
     const d = new Date(r.delivery_date);
     return d.getFullYear() === year && d.getMonth() + 1 === month;
-  }).length, [records, month, year]);
+  }), [records, month, year]);
+
+  const filteredCount = filteredRecords.length;
 
   async function handleGenerate() {
     setError(null);
     setLoading(true);
     try {
-      await downloadDriverReport(records, month, year, format, generatedByName, generatedByRole);
+      let auditSets: Map<string, Set<string>> | undefined;
+      if (statusMode === 'trail') {
+        try {
+          auditSets = await fetchHistoricStatusSets(filteredRecords);
+        } catch {
+          auditSets = undefined;
+        }
+      }
+      await downloadDriverReport(records, month, year, format, generatedByName, generatedByRole, auditSets);
       onClose();
     } catch (e: any) {
       setError(e?.message ?? 'Export failed. Please try again.');
@@ -118,6 +130,38 @@ export default function DriverReportModal({ records, onClose, generatedByName, g
               <option value="docx">Word (.docx)</option>
               <option value="csv">CSV (.csv)</option>
             </select>
+          </div>
+
+          {/* Status Mode */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Status Counting</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setStatusMode('current')}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                  statusMode === 'current'
+                    ? 'bg-[#1F3864] text-white border-[#1F3864]'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <Clock className="w-3 h-3" /> Current Status
+              </button>
+              <button
+                onClick={() => setStatusMode('trail')}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                  statusMode === 'trail'
+                    ? 'bg-[#1F3864] text-white border-[#1F3864]'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <History className="w-3 h-3" /> Status Trail
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              {statusMode === 'current'
+                ? 'Counts each record once based on its current status.'
+                : 'Counts every status each record has passed through. Totals may exceed record count.'}
+            </p>
           </div>
 
           {/* Record count hint */}
