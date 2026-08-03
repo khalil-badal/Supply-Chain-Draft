@@ -4,23 +4,47 @@ import { requireAuth, requireRole } from '../middleware/auth';
 
 const router = Router();
 
+const DEFAULT_DRIVERS = [
+  { name: 'Lando Navarro',     type: 'DRIVER',    areas: ['Makati', 'BGC', 'Taguig', 'Mandaluyong', 'San Juan', 'Pasig', 'Ortigas'] },
+  { name: 'Manny Santos',      type: 'DRIVER',    areas: ['Quezon City', 'Marikina', 'Caloocan', 'Valenzuela', 'Malabon', 'Bulacan', 'Cainta', 'Antipolo'] },
+  { name: 'Ronald de la Cruz', type: 'DRIVER',    areas: ['Manila', 'Parañaque', 'Pasay', 'Las Piñas', 'Muntinlupa', 'Cavite', 'Laguna', 'Batangas'] },
+  { name: 'Jayson Reyes',      type: 'ASSISTANT', areas: [] },
+  { name: 'Bong Alvarez',      type: 'ASSISTANT', areas: [] },
+  { name: 'Ricky Mendoza',     type: 'ASSISTANT', areas: [] },
+];
+
+function serialize(d: any) {
+  return {
+    id: d.id,
+    name: d.name,
+    type: d.type,
+    coverage_areas: JSON.parse(d.coverageAreas || '[]') as string[],
+    is_active: d.isActive,
+    created_by: d.createdBy,
+    created_at: d.createdAt,
+    modified_by: d.modifiedBy,
+    modified_at: d.modifiedAt,
+  };
+}
+
 // List all drivers (active only by default, ?all=1 for all)
+// Auto-seeds the default drivers if the table is empty.
 router.get('/', requireAuth, async (req, res) => {
+  const total = await prisma.driver.count();
+  if (total === 0) {
+    await prisma.driver.createMany({
+      data: DEFAULT_DRIVERS.map(d => ({
+        name: d.name,
+        type: d.type,
+        coverageAreas: JSON.stringify(d.areas),
+        createdBy: 'system',
+        modifiedBy: 'system',
+      })),
+    });
+  }
   const where = req.query.all === '1' ? {} : { isActive: true };
   const drivers = await prisma.driver.findMany({ where, orderBy: { name: 'asc' } });
-  res.json(
-    drivers.map(d => ({
-      id: d.id,
-      name: d.name,
-      type: d.type,
-      coverage_areas: JSON.parse(d.coverageAreas || '[]') as string[],
-      is_active: d.isActive,
-      created_by: d.createdBy,
-      created_at: d.createdAt,
-      modified_by: d.modifiedBy,
-      modified_at: d.modifiedAt,
-    }))
-  );
+  res.json(drivers.map(serialize));
 });
 
 // Create a driver — Logistics + Admin only
@@ -38,17 +62,7 @@ router.post('/', requireAuth, requireRole('LOGISTICS', 'ADMIN'), async (req, res
       modifiedBy: req.user!.name,
     },
   });
-  res.status(201).json({
-    id: created.id,
-    name: created.name,
-    type: created.type,
-    coverage_areas: JSON.parse(created.coverageAreas) as string[],
-    is_active: created.isActive,
-    created_by: created.createdBy,
-    created_at: created.createdAt,
-    modified_by: created.modifiedBy,
-    modified_at: created.modifiedAt,
-  });
+  res.status(201).json(serialize(created));
 });
 
 // Update a driver — Logistics + Admin only
@@ -67,17 +81,7 @@ router.put('/:id', requireAuth, requireRole('LOGISTICS', 'ADMIN'), async (req, r
       modifiedBy: req.user!.name,
     },
   });
-  res.json({
-    id: updated.id,
-    name: updated.name,
-    type: updated.type,
-    coverage_areas: JSON.parse(updated.coverageAreas) as string[],
-    is_active: updated.isActive,
-    created_by: updated.createdBy,
-    created_at: updated.createdAt,
-    modified_by: updated.modifiedBy,
-    modified_at: updated.modifiedAt,
-  });
+  res.json(serialize(updated));
 });
 
 // Delete a driver — Logistics + Admin only (soft-delete via is_active=false preferred, but hard-delete supported)
