@@ -143,14 +143,13 @@ export default function App() {
     setDataLoading(true);
     setDataError(null);
     try {
-      const [records, companyList, customerList, supplierList, stats, skuList, driverList] = await Promise.all([
+      const [records, companyList, customerList, supplierList, stats, skuList] = await Promise.all([
         api.getRecords(),
         api.getCompanies(),
         api.getCustomers(),
         api.getSuppliers(),
         api.getDashboardStats(),
         api.getSkus(),
-        api.getDrivers(true),
       ]);
       setDeliveryRecords(records.map(normalizeApiRecord));
       setCompanies(companyList);
@@ -158,13 +157,21 @@ export default function App() {
       setSuppliers(supplierList);
       setDashboardStats(stats);
       setProducts(skuList);
-      setManagedDrivers(driverList);
-      setManagedDriverList(driverList.map(d => ({
-        name: d.name,
-        type: d.type,
-        coverage_areas: d.coverage_areas,
-        is_active: d.is_active,
-      })));
+
+      // Driver manager fetch is non-blocking — if the Driver table doesn't
+      // exist yet (migration not run), core data still loads.
+      try {
+        const driverList = await api.getDrivers(true);
+        setManagedDrivers(driverList);
+        setManagedDriverList(driverList.map(d => ({
+          name: d.name,
+          type: d.type,
+          coverage_areas: d.coverage_areas,
+          is_active: d.is_active,
+        })));
+      } catch {
+        // Driver table may not exist yet — fall back to hardcoded defaults
+      }
     } catch (err) {
       setDataError(err instanceof ApiError ? err.message : 'Failed to load data from the server.');
     } finally {
