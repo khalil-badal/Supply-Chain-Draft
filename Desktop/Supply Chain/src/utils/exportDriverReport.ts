@@ -941,12 +941,17 @@ async function exportPDF(
   const { default: autoTable } = await import('jspdf-autotable');
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const NAVY_RGB: [number, number, number] = [31, 56, 100];
+  const NAVY_RGB: [number, number, number]   = [31, 56, 100];
+  const DARKER_RGB: [number, number, number] = [13, 27, 42];
+  const GOLD_RGB: [number, number, number]   = [255, 192, 0];
+  const LTGOLD_RGB: [number, number, number] = [255, 242, 204];
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const MARGIN = 10;
   const centerX = pageW / 2;
   const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const assigned = deliveries.filter(r => r.driver?.trim());
+  const pctStr = (n: number, total: number) => total > 0 ? `${((n / total) * 100).toFixed(2)}%` : '0.00%';
 
   // ── Logo ────────────────────────────────────────────────────────────────────
   const logo = await loadLogoBase64();
@@ -1035,6 +1040,7 @@ async function exportPDF(
   const totPend = [...stats.values()].reduce((n, s) => n + s.pend, 0);
   const grand   = totAcc + totRH + totPend;
   perfRows.push(['TOTALS', totAcc, totRH, totPend, grand] as any);
+  perfRows.push(['PERCENTAGE', pctStr(totAcc, grand), pctStr(totRH, grand), pctStr(totPend, grand), '100.00%'] as any);
 
   autoTable(doc, {
     startY: y,
@@ -1047,9 +1053,14 @@ async function exportPDF(
     alternateRowStyles: altRowStyles,
     columnStyles: { 0: { halign: 'left' } },
     didParseCell: (data: any) => {
-      if (data.section === 'body' && data.row.index === perfRows.length - 1) {
+      if (data.section === 'body' && data.row.index === perfRows.length - 2) {
         data.cell.styles.fillColor = NAVY_RGB;
         data.cell.styles.textColor = [255, 255, 255];
+        data.cell.styles.fontStyle = 'bold';
+      }
+      if (data.section === 'body' && data.row.index === perfRows.length - 1) {
+        data.cell.styles.fillColor = DARKER_RGB;
+        data.cell.styles.textColor = GOLD_RGB;
         data.cell.styles.fontStyle = 'bold';
       }
     },
@@ -1068,7 +1079,9 @@ async function exportPDF(
     return [d, ...s.dep, s.dep.reduce((a, b) => a + b, 0)];
   });
   const depTot = [0, 1, 2, 3].map(i => [...stats.values()].reduce((n, s) => n + s.dep[i], 0));
-  depRows.push(['TOTALS', ...depTot, depTot.reduce((a, b) => a + b, 0)] as any);
+  const depGrand = depTot.reduce((a, b) => a + b, 0);
+  depRows.push(['TOTALS', ...depTot, depGrand] as any);
+  depRows.push(['PERCENTAGE', ...depTot.map(t => pctStr(t, depGrand)), '100.00%'] as any);
 
   autoTable(doc, {
     startY: y,
@@ -1081,9 +1094,14 @@ async function exportPDF(
     alternateRowStyles: altRowStyles,
     columnStyles: { 0: { halign: 'left' } },
     didParseCell: (data: any) => {
-      if (data.section === 'body' && data.row.index === depRows.length - 1) {
+      if (data.section === 'body' && data.row.index === depRows.length - 2) {
         data.cell.styles.fillColor = NAVY_RGB;
         data.cell.styles.textColor = [255, 255, 255];
+        data.cell.styles.fontStyle = 'bold';
+      }
+      if (data.section === 'body' && data.row.index === depRows.length - 1) {
+        data.cell.styles.fillColor = DARKER_RGB;
+        data.cell.styles.textColor = GOLD_RGB;
         data.cell.styles.fontStyle = 'bold';
       }
     },
@@ -1102,7 +1120,9 @@ async function exportPDF(
     return [d, ...s.arr, s.arr.reduce((a, b) => a + b, 0)];
   });
   const arrTot = [0, 1, 2, 3].map(i => [...stats.values()].reduce((n, s) => n + s.arr[i], 0));
-  arrRows.push(['TOTALS', ...arrTot, arrTot.reduce((a, b) => a + b, 0)] as any);
+  const arrGrand = arrTot.reduce((a, b) => a + b, 0);
+  arrRows.push(['TOTALS', ...arrTot, arrGrand] as any);
+  arrRows.push(['PERCENTAGE', ...arrTot.map(t => pctStr(t, arrGrand)), '100.00%'] as any);
 
   autoTable(doc, {
     startY: y,
@@ -1115,12 +1135,134 @@ async function exportPDF(
     alternateRowStyles: altRowStyles,
     columnStyles: { 0: { halign: 'left' } },
     didParseCell: (data: any) => {
-      if (data.section === 'body' && data.row.index === arrRows.length - 1) {
+      if (data.section === 'body' && data.row.index === arrRows.length - 2) {
         data.cell.styles.fillColor = NAVY_RGB;
         data.cell.styles.textColor = [255, 255, 255];
         data.cell.styles.fontStyle = 'bold';
       }
+      if (data.section === 'body' && data.row.index === arrRows.length - 1) {
+        data.cell.styles.fillColor = DARKER_RGB;
+        data.cell.styles.textColor = GOLD_RGB;
+        data.cell.styles.fontStyle = 'bold';
+      }
     },
+    didDrawPage: pageCallback,
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 8;
+
+  // ── Section 4: Area Coverage ────────────────────────────────────────────────
+  if (y > 165) { doc.addPage(); y = 14; }
+  y = sectionBar('AREA COVERAGE', y);
+
+  const areaRows: (string | number)[][] = [];
+  let totalAreaCount = 0;
+  for (const group of AREA_GROUPS) {
+    const groupAreas = group.areas.filter(a => deliveries.some(d => d.area === a));
+    const groupTotal = groupAreas.reduce((n, a) => n + deliveries.filter(d => d.area === a).length, 0);
+    if (groupTotal === 0) continue;
+    for (const area of groupAreas) {
+      const cnt = deliveries.filter(d => d.area === area).length;
+      if (cnt === 0) continue;
+      areaRows.push([group.label, area, cnt, pctStr(cnt, groupTotal)]);
+      totalAreaCount += cnt;
+    }
+    areaRows.push([`${group.label} — Subtotal`, '', groupTotal, '100.00%']);
+  }
+  const grandRowIdx = areaRows.length;
+  areaRows.push(['TOTAL AREA COVERED', '', totalAreaCount, '100.00%']);
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGIN, right: MARGIN },
+    head: [['Area Group', 'Area', 'Deliveries', '% of Group']],
+    body: areaRows,
+    headStyles,
+    styles: tableStyles,
+    bodyStyles,
+    alternateRowStyles: altRowStyles,
+    columnStyles: { 0: { halign: 'left' }, 1: { halign: 'left' } },
+    didParseCell: (data: any) => {
+      if (data.section !== 'body') return;
+      if (data.row.index === grandRowIdx) {
+        data.cell.styles.fillColor = NAVY_RGB;
+        data.cell.styles.textColor = [255, 255, 255];
+        data.cell.styles.fontStyle = 'bold';
+      } else if (String(data.row.raw[0]).includes('Subtotal')) {
+        data.cell.styles.fillColor = LTGOLD_RGB;
+        data.cell.styles.fontStyle = 'bold';
+      }
+    },
+    didDrawPage: pageCallback,
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 8;
+
+  // ── Section 5: Vehicle Plate Breakdown ──────────────────────────────────────
+  if (y > 165) { doc.addPage(); y = 14; }
+  y = sectionBar('VEHICLE PLATE BREAKDOWN', y);
+
+  const allVehicles = [...new Set(assigned.map(rec => rec.vehicle?.trim()).filter(Boolean) as string[])].sort();
+  const vehRows: (string | number)[][] = allVehicles.map(v => {
+    const recs = assigned.filter(rec => rec.vehicle?.trim() === v);
+    const acc  = recs.filter(rec => rec.status === 'Delivered').length;
+    const rh   = recs.filter(rec => rec.status === 'Rescheduled' || rec.status === 'On-Hold').length;
+    const pend = recs.filter(rec => rec.status === 'Pending' || rec.status === 'Scheduled').length;
+    return [v, acc, rh, pend, acc + rh + pend];
+  });
+  const vTotAcc  = vehRows.reduce((n, row) => n + (row[1] as number), 0);
+  const vTotRH   = vehRows.reduce((n, row) => n + (row[2] as number), 0);
+  const vTotPend = vehRows.reduce((n, row) => n + (row[3] as number), 0);
+  const vGrand   = vTotAcc + vTotRH + vTotPend;
+  vehRows.push(['TOTALS', vTotAcc, vTotRH, vTotPend, vGrand]);
+  vehRows.push(['PERCENTAGE', pctStr(vTotAcc, vGrand), pctStr(vTotRH, vGrand), pctStr(vTotPend, vGrand), '100.00%']);
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGIN, right: MARGIN },
+    head: [['Vehicle Plate', 'Accomplished', 'Resched / Hold', 'Pending', 'Total']],
+    body: vehRows,
+    headStyles,
+    styles: tableStyles,
+    bodyStyles,
+    alternateRowStyles: altRowStyles,
+    columnStyles: { 0: { halign: 'left' } },
+    didParseCell: (data: any) => {
+      if (data.section === 'body' && data.row.index === vehRows.length - 2) {
+        data.cell.styles.fillColor = NAVY_RGB;
+        data.cell.styles.textColor = [255, 255, 255];
+        data.cell.styles.fontStyle = 'bold';
+      }
+      if (data.section === 'body' && data.row.index === vehRows.length - 1) {
+        data.cell.styles.fillColor = DARKER_RGB;
+        data.cell.styles.textColor = GOLD_RGB;
+        data.cell.styles.fontStyle = 'bold';
+      }
+    },
+    didDrawPage: pageCallback,
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 8;
+
+  // ── Section 6: Driver Remarks ───────────────────────────────────────────────
+  if (y > 165) { doc.addPage(); y = 14; }
+  y = sectionBar('DRIVER REMARKS', y);
+
+  const remarkRows = drivers.map(d => {
+    const s = stats.get(d)!;
+    return [d, s.lastRemark || '—'];
+  });
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGIN, right: MARGIN },
+    head: [["Driver's Name", 'Last Remark']],
+    body: remarkRows,
+    headStyles,
+    styles: tableStyles,
+    bodyStyles,
+    alternateRowStyles: altRowStyles,
+    columnStyles: { 0: { halign: 'left', cellWidth: 50 }, 1: { halign: 'left' } },
     didDrawPage: pageCallback,
   });
 
@@ -1130,11 +1272,14 @@ async function exportPDF(
 // ─── DOCX Export ──────────────────────────────────────────────────────────────
 
 async function exportDOCX(
+  deliveries: DeliveryRecord[],
   drivers: string[],
   stats: Map<string, DriverStats>,
   month: string, year: number,
   byName: string, byRole: string,
 ): Promise<void> {
+  const assigned = deliveries.filter(r => r.driver?.trim());
+  const pctStr = (n: number, total: number) => total > 0 ? `${((n / total) * 100).toFixed(2)}%` : '0.00%';
   const {
     Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, ImageRun,
     AlignmentType, WidthType, PageOrientation, VerticalAlign,
@@ -1196,7 +1341,12 @@ async function exportDOCX(
   });
 
   // ── Table builder ─────────────────────────────────────────────────────────
-  function buildTable(headers: string[], rows: (string | number)[][]): InstanceType<typeof Table> {
+  // `highlight` maps a data-row index to a fill/text-color override (used for TOTALS/PERCENTAGE/subtotal rows)
+  function buildTable(
+    headers: string[],
+    rows: (string | number)[][],
+    highlight?: Record<number, { fill: string; color: string }>,
+  ): InstanceType<typeof Table> {
     const colW = Math.floor(CONTENT_W / headers.length);
     const lastW = CONTENT_W - colW * (headers.length - 1);
 
@@ -1215,21 +1365,22 @@ async function exportDOCX(
       ),
     });
 
-    const dataRows = rows.map((row, idx) =>
-      new TableRow({
+    const dataRows = rows.map((row, idx) => {
+      const hl = highlight?.[idx];
+      return new TableRow({
         children: row.map((v, i) =>
           new TableCell({
-            shading: idx % 2 === 1 ? { fill: 'F8F9FA' } : undefined,
+            shading: hl ? { fill: hl.fill } : (idx % 2 === 1 ? { fill: 'F8F9FA' } : undefined),
             borders: thinBorders,
             width: { size: i === row.length - 1 ? lastW : colW, type: WidthType.DXA },
             children: [new Paragraph({
               alignment: i === 0 ? AlignmentType.LEFT : AlignmentType.CENTER,
-              children: [new TextRun({ text: String(v), size: 17, bold: i === 0 })],
+              children: [new TextRun({ text: String(v), size: 17, bold: i === 0 || !!hl, color: hl?.color })],
             })],
           }),
         ),
-      }),
-    );
+      });
+    });
 
     return new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
@@ -1238,6 +1389,10 @@ async function exportDOCX(
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
+  const NAVY_HL   = { fill: navyFill, color: 'FFFFFF' };
+  const DARKER_HL = { fill: '0D1B2A', color: 'FFC000' };
+  const GOLD_HL   = { fill: 'FFF2CC', color: '1F3864' };
+
   const perfHeaders = ["Driver's Name", 'Accomplished', 'Resched / Hold', 'Pending', 'Total'];
   const perfRows = drivers.map(d => {
     const s = stats.get(d)!;
@@ -1246,7 +1401,10 @@ async function exportDOCX(
   const tA = [...stats.values()].reduce((n, s) => n + s.acc, 0);
   const tR = [...stats.values()].reduce((n, s) => n + s.rh, 0);
   const tP = [...stats.values()].reduce((n, s) => n + s.pend, 0);
-  perfRows.push(['TOTALS', tA, tR, tP, tA + tR + tP]);
+  const perfGrand = tA + tR + tP;
+  perfRows.push(['TOTALS', tA, tR, tP, perfGrand]);
+  perfRows.push(['PERCENTAGE', pctStr(tA, perfGrand), pctStr(tR, perfGrand), pctStr(tP, perfGrand), '100.00%']);
+  const perfHighlight = { [perfRows.length - 2]: NAVY_HL, [perfRows.length - 1]: DARKER_HL };
 
   const depHeaders = ["Driver's Name", '8:00–8:30am', '8:30–9:00am', '9:00–9:30am', '9:30am+', 'Total'];
   const depRows = drivers.map(d => {
@@ -1254,7 +1412,10 @@ async function exportDOCX(
     return [d, ...s.dep, s.dep.reduce((a, b) => a + b, 0)];
   });
   const depTot = [0, 1, 2, 3].map(i => [...stats.values()].reduce((n, s) => n + s.dep[i], 0));
-  depRows.push(['TOTALS', ...depTot, depTot.reduce((a, b) => a + b, 0)]);
+  const depGrand = depTot.reduce((a, b) => a + b, 0);
+  depRows.push(['TOTALS', ...depTot, depGrand]);
+  depRows.push(['PERCENTAGE', ...depTot.map(t => pctStr(t, depGrand)), '100.00%']);
+  const depHighlight = { [depRows.length - 2]: NAVY_HL, [depRows.length - 1]: DARKER_HL };
 
   const arrHeaders = ["Driver's Name", '6:00–6:30pm', '6:30–7:00pm', '7:00–7:30pm', '7:30pm+', 'Total'];
   const arrRows = drivers.map(d => {
@@ -1262,7 +1423,56 @@ async function exportDOCX(
     return [d, ...s.arr, s.arr.reduce((a, b) => a + b, 0)];
   });
   const arrTot = [0, 1, 2, 3].map(i => [...stats.values()].reduce((n, s) => n + s.arr[i], 0));
-  arrRows.push(['TOTALS', ...arrTot, arrTot.reduce((a, b) => a + b, 0)]);
+  const arrGrand = arrTot.reduce((a, b) => a + b, 0);
+  arrRows.push(['TOTALS', ...arrTot, arrGrand]);
+  arrRows.push(['PERCENTAGE', ...arrTot.map(t => pctStr(t, arrGrand)), '100.00%']);
+  const arrHighlight = { [arrRows.length - 2]: NAVY_HL, [arrRows.length - 1]: DARKER_HL };
+
+  // Area coverage
+  const areaHeaders = ['Area Group', 'Area', 'Deliveries', '% of Group'];
+  const areaRows: (string | number)[][] = [];
+  const areaHighlight: Record<number, { fill: string; color: string }> = {};
+  let totalAreaCount = 0;
+  for (const group of AREA_GROUPS) {
+    const groupAreas = group.areas.filter(a => deliveries.some(d => d.area === a));
+    const groupTotal = groupAreas.reduce((n, a) => n + deliveries.filter(d => d.area === a).length, 0);
+    if (groupTotal === 0) continue;
+    for (const area of groupAreas) {
+      const cnt = deliveries.filter(d => d.area === area).length;
+      if (cnt === 0) continue;
+      areaRows.push([group.label, area, cnt, pctStr(cnt, groupTotal)]);
+      totalAreaCount += cnt;
+    }
+    areaRows.push([`${group.label} — Subtotal`, '', groupTotal, '100.00%']);
+    areaHighlight[areaRows.length - 1] = GOLD_HL;
+  }
+  areaRows.push(['TOTAL AREA COVERED', '', totalAreaCount, '100.00%']);
+  areaHighlight[areaRows.length - 1] = NAVY_HL;
+
+  // Vehicle plate breakdown
+  const vehHeaders = ['Vehicle Plate', 'Accomplished', 'Resched / Hold', 'Pending', 'Total'];
+  const allVehicles = [...new Set(assigned.map(rec => rec.vehicle?.trim()).filter(Boolean) as string[])].sort();
+  const vehRows: (string | number)[][] = allVehicles.map(v => {
+    const recs = assigned.filter(rec => rec.vehicle?.trim() === v);
+    const acc  = recs.filter(rec => rec.status === 'Delivered').length;
+    const rh   = recs.filter(rec => rec.status === 'Rescheduled' || rec.status === 'On-Hold').length;
+    const pend = recs.filter(rec => rec.status === 'Pending' || rec.status === 'Scheduled').length;
+    return [v, acc, rh, pend, acc + rh + pend];
+  });
+  const vTotAcc  = vehRows.reduce((n, row) => n + (row[1] as number), 0);
+  const vTotRH   = vehRows.reduce((n, row) => n + (row[2] as number), 0);
+  const vTotPend = vehRows.reduce((n, row) => n + (row[3] as number), 0);
+  const vGrand   = vTotAcc + vTotRH + vTotPend;
+  vehRows.push(['TOTALS', vTotAcc, vTotRH, vTotPend, vGrand]);
+  vehRows.push(['PERCENTAGE', pctStr(vTotAcc, vGrand), pctStr(vTotRH, vGrand), pctStr(vTotPend, vGrand), '100.00%']);
+  const vehHighlight = { [vehRows.length - 2]: NAVY_HL, [vehRows.length - 1]: DARKER_HL };
+
+  // Driver remarks
+  const remarkHeaders = ["Driver's Name", 'Last Remark'];
+  const remarkRows = drivers.map(d => {
+    const s = stats.get(d)!;
+    return [d, s.lastRemark || '—'];
+  });
 
   // ── Build document ────────────────────────────────────────────────────────
   const doc = new Document({
@@ -1281,17 +1491,32 @@ async function exportDOCX(
 
         colorBar('SECTION 1 — DELIVERY PERFORMANCE', navyFill, 'FFFFFF', true),
         gap(),
-        buildTable(perfHeaders, perfRows),
+        buildTable(perfHeaders, perfRows, perfHighlight),
         gap(),
 
         colorBar('SECTION 2 — DEPARTURE TIME BREAKDOWN', navyFill, 'FFFFFF', true),
         gap(),
-        buildTable(depHeaders, depRows),
+        buildTable(depHeaders, depRows, depHighlight),
         gap(),
 
         colorBar('SECTION 3 — ARRIVAL TIME BREAKDOWN', navyFill, 'FFFFFF', true),
         gap(),
-        buildTable(arrHeaders, arrRows),
+        buildTable(arrHeaders, arrRows, arrHighlight),
+        gap(),
+
+        colorBar('SECTION 4 — AREA COVERAGE', navyFill, 'FFFFFF', true),
+        gap(),
+        buildTable(areaHeaders, areaRows, areaHighlight),
+        gap(),
+
+        colorBar('SECTION 5 — VEHICLE PLATE BREAKDOWN', navyFill, 'FFFFFF', true),
+        gap(),
+        buildTable(vehHeaders, vehRows, vehHighlight),
+        gap(),
+
+        colorBar('SECTION 6 — DRIVER REMARKS', navyFill, 'FFFFFF', true),
+        gap(),
+        buildTable(remarkHeaders, remarkRows),
         gap(),
 
         new Paragraph({
@@ -1384,7 +1609,7 @@ export async function downloadDriverReport(
   }
 
   if (format === 'docx') {
-    await exportDOCX(drivers, stats, mo, year, generatedByName, generatedByRole);
+    await exportDOCX(deliveries, drivers, stats, mo, year, generatedByName, generatedByRole);
     return;
   }
 
