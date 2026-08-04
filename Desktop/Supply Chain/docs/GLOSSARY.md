@@ -16,6 +16,7 @@ Plain-English definitions of terms used throughout this codebase and its docs. I
 - **Procurement Pick-up** — a record category for goods being picked up from a supplier, as opposed to delivered to a customer.
 - **Reorder Point** — the stock quantity threshold at which a product should be reordered, tracked per SKU.
 - **Route Slip** — a printable/exportable daily schedule document for a driver, matching Microgenesis's existing paper form.
+- **Status Trail (export)** — an export mode, available alongside the normal export in every export menu, that counts each record under **every** status it has ever held (Pending, Scheduled, etc.), not just its current one. Built specifically in response to a request from Logistics. See `README.md`'s Audit Logs section.
 
 ### Technical terms
 
