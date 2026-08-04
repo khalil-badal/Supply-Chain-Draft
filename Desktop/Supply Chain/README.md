@@ -6,8 +6,13 @@ A full-stack replacement for **Microgenesis Business Systems'** internal Supply 
 
 This document is written for two audiences at once: engineers who need to run, extend, or evaluate the codebase, and stakeholders who want to understand *why* the system is built the way it is and what it replaces. Wherever a feature is described, the intent is to answer not just "what does this do" but "what business problem does this solve, and for whom."
 
+> **New to this project?** Start with [`GETTING_STARTED.md`](./GETTING_STARTED.md) for step-by-step local setup, and read [`DONT_BREAK_THIS.md`](./DONT_BREAK_THIS.md) before making changes — it covers the handful of things in this codebase that look editable but will quietly break something if changed without context. Unfamiliar terms (TASS, RMA, SKU, migration, etc.) are defined in [`docs/GLOSSARY.md`](./docs/GLOSSARY.md).
+
 ## Table of Contents
 
+- **[Getting Started (step-by-step for newcomers)](./GETTING_STARTED.md)**
+- **[Don't Break This (read before making changes)](./DONT_BREAK_THIS.md)**
+- **[Glossary](./docs/GLOSSARY.md)** · **[Roles & Permissions detail](./docs/ROLES.md)**
 - [Full-Stack Setup](#full-stack-setup)
 - [Background](#background)
 - [System Architecture](#system-architecture)
@@ -121,51 +126,13 @@ This separation exists so that **authorization cannot be bypassed by talking to 
 
 ## Roles & Permissions (RBAC)
 
-### Overview
+Access is real, server-enforced role-based access control tied to a login — the frontend UI reflects the same rules the backend enforces on every request (`requireAuth` + `requireRole(...)` in `server/src/middleware/auth.ts`). There are **five** roles: `SALES_COORDINATOR`, `LOGISTICS`, `TASS`, `ADMIN`, `DRIVER`. Each role gets a default set of accessible screens (`DEFAULT_ROLE_SCOPE` in `src/App.tsx`); an Admin can additionally grant or revoke individual screens per user.
 
-Access is real, server-enforced role-based access control tied to a login — the frontend UI reflects the same rules the backend enforces on every request (`requireAuth` + `requireRole(...)` in `server/src/middleware/auth.ts`). There are **five** roles: `SALES_COORDINATOR`, `LOGISTICS`, `TASS`, `ADMIN`, `DRIVER`.
+RBAC exists because different departments have different responsibilities and different blast radii if they make a mistake — a Sales Coordinator entering a wrong delivery date is a data-entry error, but marking a delivery "Accomplished" without it happening is a billing and customer-trust problem. The software enforces the same separation of duties the business expects on paper: record *creation* (Sales Coordinator) is separated from *dispatch execution* (Logistics/Driver) and from *collection verification* (TASS exclusively).
 
-> **Provisional role notice — TASS:** `TASS` stands for **Technical Admin System Services**, not Accounting or Finance. The permissions, screens, and workflows currently assigned to TASS in this codebase (e.g. collection verification) are **our current best-guess implementation**, based on assumptions made before a stakeholder meeting with the TASS department has taken place. They are **not confirmed requirements**. Where this document describes TASS doing collection/billing-style work below, that reflects what is implemented today, not a validated definition of the department's actual responsibilities — expect this role's permissions and workflows to be revised once we meet with TASS stakeholders and confirm real requirements.
+> **⚠️ TASS is provisional.** `TASS` = **Technical Admin System Services**, not Accounting or Finance. Its permissions below are this project's current best-guess implementation, made **before** a stakeholder meeting with the TASS department — treat them as unconfirmed and subject to change.
 
-Each role gets a default set of accessible screens (see `DEFAULT_ROLE_SCOPE` in `src/App.tsx`); an Admin can additionally grant or revoke individual screens per user via `UserPermission` records, layered on top of the role default.
-
-### Why it Matters
-
-A shared SharePoint list has no concept of "this person should not be able to change a delivery's status" beyond folder-level permissions that are coarse and easy to misconfigure. In a real logistics operation, different departments have different responsibilities and different blast radii if they make a mistake: a Sales Coordinator entering a wrong delivery date is a data-entry error; a Sales Coordinator marking a delivery "Accomplished" without it actually happening is a billing and customer-trust problem. RBAC exists to make the software enforce the same separation of duties the business already expects on paper.
-
-### Business Benefits
-
-- **Security** — every write endpoint is gated by `requireRole(...)`, so a compromised or misused frontend session cannot perform an action outside that user's role, even by calling the API directly.
-- **Separation of duties** — record *creation* (Sales Coordinator) is deliberately separated from record *dispatch execution* (Logistics/Driver) and from *collection verification* (TASS exclusively), so no single role can create, ship, and verify payment on the same record unchecked.
-- **Data protection** — TASS, currently scoped in this implementation to collection verification, cannot edit delivery details it has no business changing; Sales Coordinator, whose job is order intake, cannot alter shipment status after the fact.
-- **Operational responsibility** — each department only sees the categories of record relevant to its job (see the table below), which reduces noise and makes each team's screen a working tool rather than a dumping ground of everyone else's data.
-
-### Department Impact / Operational Workflow
-
-| | **Sales Coordinator** | **Logistics** | **TASS** (Technical Admin System Services)† | **Admin** | **Driver** |
-|---|---|---|---|---|---|
-| Primary purpose | Creates and owns delivery records | Manages driver-side field operations & master data | Currently implemented as: verifies billing/collection status (provisional — see note below) | System administration & demo tooling | Field execution — mobile-style app only |
-| UI shell | Full sidebar + dashboard | Full sidebar + dashboard | Full sidebar + dashboard | Full sidebar + dashboard | **Dedicated full-screen `DriverDashboard`**, no sidebar |
-| Create new records | ✅ (with Auto Fill) | ❌ | ❌ | ❌ (not a normal workflow role) | ❌ |
-| Edit record fields (drawer) | ✅ full edit | ✅ Driver/vehicle/assistant assignment, and full edit | ❌ read-only | ✅ full edit | ✅ (own assigned records only) |
-| Change record status | ❌ (server-blocked; view only) | ✅ | ❌ read-only | ✅ | ✅ (own assigned records only) |
-| Verify Accounting Collection | ❌ | ❌ | ✅ exclusive (`PATCH /:id/verify-collection`) | ❌ | ❌ |
-| Which categories are visible | All | All | **Accounting Collection, RMA, Procurement Pick-up** | All | Only records assigned to that driver |
-| Driver Dispatch Board / Driver Board / Calendar | ❌ | ✅ | ❌ | ✅ | N/A (has its own app instead) |
-| Driver Manager (driver directory CRUD) | ❌ | ✅ | ❌ | ✅ | ❌ |
-| Customers / Suppliers directories | ✅ | ✅ | Suppliers only | ✅ | ❌ |
-| SKU Master / Inventory / Transactions | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Admin Panel / Data Sampler | ❌ | ❌ | ❌ | ✅ exclusive | ❌ |
-| Statistical Reports / Status History | ❌ | ✅ | ❌ | ✅ | ❌ |
-| Dashboard KPIs | Delivery-focused, from `GET /api/dashboard/stats` (Scheduled/Pending Driver/On-Hold/Rescheduled/Completed Today) | Inventory & fulfillment-focused | Inventory & fulfillment-focused | All KPIs | N/A |
-
-In practice, a typical delivery's lifecycle crosses three roles: Sales Coordinator creates the record with customer/company/item details; Logistics assigns a driver, vehicle, and schedule and progresses status through dispatch; and, for Accounting Collection records specifically, TASS currently performs the final collection verification step in this implementation. No single role can complete that whole chain alone, by design.
-
-† **TASS = Technical Admin System Services.** The collection-verification responsibilities shown above are this project's current, unvalidated implementation of the role, not a confirmed description of what the TASS department actually does — they are expected to be revisited after stakeholder discussions with TASS.
-
-### Technical Highlights
-
-Permissions are enforced twice: on the frontend (hides nav items and shows an access-request prompt for anything outside `effectiveScreens`) and, authoritatively, on every backend route via `requireRole(...)` — a user cannot get server data for a screen they aren't permitted, even by calling the API directly. Per-user overrides live in `UserPermission` (`@@unique([userId, screen])`) and are layered on top of `DEFAULT_ROLE_SCOPE`, so an Admin can, for example, grant a specific Sales Coordinator temporary read access to Statistical Reports without changing that person's role. One screen — Warehouses — is force-excluded from every role's effective set directly in `App.tsx`, including against stale permission grants, so a retired module can't be reached even by manipulating permissions.
+**For the full permissions table (who can do what, screen by screen) and the TASS status tracker, see [`docs/ROLES.md`](./docs/ROLES.md).**
 
 ## Logistics Operations
 
@@ -547,9 +514,11 @@ server/
 
 ## Getting Started
 
+**For step-by-step local setup written for someone new to this codebase, see [`GETTING_STARTED.md`](./GETTING_STARTED.md).** The quick reference below assumes you've already done that once.
+
 **Prerequisites:** Node.js 18+, a PostgreSQL database (local or remote).
 
-See [Full-Stack Setup](#full-stack-setup) for the full two-process local dev flow — the backend must be running for the frontend to load any data beyond the login screen.
+See [Full-Stack Setup](#full-stack-setup) for the two-process local dev flow — the backend must be running for the frontend to load any data beyond the login screen.
 
 ```bash
 npm install
