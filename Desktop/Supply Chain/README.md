@@ -125,6 +125,8 @@ This separation exists so that **authorization cannot be bypassed by talking to 
 
 Access is real, server-enforced role-based access control tied to a login — the frontend UI reflects the same rules the backend enforces on every request (`requireAuth` + `requireRole(...)` in `server/src/middleware/auth.ts`). There are **five** roles: `SALES_COORDINATOR`, `LOGISTICS`, `TASS`, `ADMIN`, `DRIVER`.
 
+> **Provisional role notice — TASS:** `TASS` stands for **Technical Admin System Services**, not Accounting or Finance. The permissions, screens, and workflows currently assigned to TASS in this codebase (e.g. collection verification) are **our current best-guess implementation**, based on assumptions made before a stakeholder meeting with the TASS department has taken place. They are **not confirmed requirements**. Where this document describes TASS doing collection/billing-style work below, that reflects what is implemented today, not a validated definition of the department's actual responsibilities — expect this role's permissions and workflows to be revised once we meet with TASS stakeholders and confirm real requirements.
+
 Each role gets a default set of accessible screens (see `DEFAULT_ROLE_SCOPE` in `src/App.tsx`); an Admin can additionally grant or revoke individual screens per user via `UserPermission` records, layered on top of the role default.
 
 ### Why it Matters
@@ -135,14 +137,14 @@ A shared SharePoint list has no concept of "this person should not be able to ch
 
 - **Security** — every write endpoint is gated by `requireRole(...)`, so a compromised or misused frontend session cannot perform an action outside that user's role, even by calling the API directly.
 - **Separation of duties** — record *creation* (Sales Coordinator) is deliberately separated from record *dispatch execution* (Logistics/Driver) and from *collection verification* (TASS exclusively), so no single role can create, ship, and verify payment on the same record unchecked.
-- **Data protection** — TASS, whose job is financial verification, cannot edit delivery details it has no business changing; Sales Coordinator, whose job is order intake, cannot alter shipment status after the fact.
+- **Data protection** — TASS, currently scoped in this implementation to collection verification, cannot edit delivery details it has no business changing; Sales Coordinator, whose job is order intake, cannot alter shipment status after the fact.
 - **Operational responsibility** — each department only sees the categories of record relevant to its job (see the table below), which reduces noise and makes each team's screen a working tool rather than a dumping ground of everyone else's data.
 
 ### Department Impact / Operational Workflow
 
-| | **Sales Coordinator** | **Logistics** | **TASS** (Finance/Accounting) | **Admin** | **Driver** |
+| | **Sales Coordinator** | **Logistics** | **TASS** (Technical Admin System Services)† | **Admin** | **Driver** |
 |---|---|---|---|---|---|
-| Primary purpose | Creates and owns delivery records | Manages driver-side field operations & master data | Verifies billing/collection status | System administration & demo tooling | Field execution — mobile-style app only |
+| Primary purpose | Creates and owns delivery records | Manages driver-side field operations & master data | Currently implemented as: verifies billing/collection status (provisional — see note below) | System administration & demo tooling | Field execution — mobile-style app only |
 | UI shell | Full sidebar + dashboard | Full sidebar + dashboard | Full sidebar + dashboard | Full sidebar + dashboard | **Dedicated full-screen `DriverDashboard`**, no sidebar |
 | Create new records | ✅ (with Auto Fill) | ❌ | ❌ | ❌ (not a normal workflow role) | ❌ |
 | Edit record fields (drawer) | ✅ full edit | ✅ Driver/vehicle/assistant assignment, and full edit | ❌ read-only | ✅ full edit | ✅ (own assigned records only) |
@@ -157,7 +159,9 @@ A shared SharePoint list has no concept of "this person should not be able to ch
 | Statistical Reports / Status History | ❌ | ✅ | ❌ | ✅ | ❌ |
 | Dashboard KPIs | Delivery-focused, from `GET /api/dashboard/stats` (Scheduled/Pending Driver/On-Hold/Rescheduled/Completed Today) | Inventory & fulfillment-focused | Inventory & fulfillment-focused | All KPIs | N/A |
 
-In practice, a typical delivery's lifecycle crosses three roles: Sales Coordinator creates the record with customer/company/item details; Logistics assigns a driver, vehicle, and schedule and progresses status through dispatch; and, for Accounting Collection records specifically, TASS performs the final collection verification step. No single role can complete that whole chain alone, by design.
+In practice, a typical delivery's lifecycle crosses three roles: Sales Coordinator creates the record with customer/company/item details; Logistics assigns a driver, vehicle, and schedule and progresses status through dispatch; and, for Accounting Collection records specifically, TASS currently performs the final collection verification step in this implementation. No single role can complete that whole chain alone, by design.
+
+† **TASS = Technical Admin System Services.** The collection-verification responsibilities shown above are this project's current, unvalidated implementation of the role, not a confirmed description of what the TASS department actually does — they are expected to be revisited after stakeholder discussions with TASS.
 
 ### Technical Highlights
 
