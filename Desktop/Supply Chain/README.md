@@ -72,11 +72,11 @@ See `server/src/index.ts` and `server/.env.example` for backend configuration de
 
 ## Background
 
-The existing AS-IS system is a Microsoft SharePoint List that Microgenesis uses to track deliveries, returns, collections, and pick-ups. It has three confirmed pain points this portal is designed to fix:
+The existing AS-IS system is a Microsoft SharePoint List that Microgenesis uses to track deliveries, returns, collections, and pick-ups. It has three confirmed pain points this portal is designed to fix — the first two came up repeatedly as direct user complaints, not just an engineering assessment:
 
-1. **No audit trail** — the list has no reliable "who created / who last modified" record on individual entries. When a delivery date changes or a status is disputed, there is no way to answer "who did this, and when" without asking around.
+1. **No audit trail — by far the most frequent user complaint.** The SharePoint list has no reliable "who created / who last modified" record on individual entries. Users repeatedly reported that when a delivery date changed or a status was disputed, there was simply no way to answer "who did this, and when" without manually asking around the office. This portal replaces that with a real, structured `AuditLog` on every tracked record — see [Audit Logs](#audit-logs) below, including a **Status Trail export** that directly answers the specific ask Logistics raised: seeing a record counted under *every* status it ever passed through (e.g. Pending → Scheduled), not just its current one.
 2. **Free-text data entry** — fields like Company Name and Area are typed manually, causing inconsistent/duplicate values ("Microgenesis Inc." vs. "MG Inc" vs. "microgenesis"), which in turn breaks any attempt at reliable filtering, reporting, or trend analysis.
-3. **A hard record-count ceiling** — SharePoint's list view threshold (5,000 items) blocks the view once exceeded, requiring a support ticket to keep working. For an operation logging deliveries, collections, and pickups daily, this ceiling is not a hypothetical — it is a recurring operational stoppage.
+3. **A hard record-count ceiling — solved in this system, not just mitigated.** SharePoint's list view threshold (5,000 items) blocks the view once exceeded, requiring a support ticket to keep working — a genuine, recurring operational stoppage for an operation logging deliveries, collections, and pickups daily. The new portal is backed by a real PostgreSQL table instead of a SharePoint list view, which has **no equivalent item-count ceiling**: there is no 5,000-row wall to hit, no support ticket required, and no view that silently stops showing data as the operation grows. See [Dashboard](#dashboard) for the live, uncapped record count.
 
 Each of these pain points maps directly onto a subsystem documented below: audit trail → [Audit Logs](#audit-logs), free-text entry → validated lookups and master data tables ([Database Architecture](#database-architecture)), and the record ceiling → a Postgres-backed record table with no artificial view limit ([Dashboard](#dashboard)).
 
@@ -236,6 +236,8 @@ Exporting is one of the most heavily built-out subsystems in the portal, because
 - **`routeSlip.ts`** — the "Daily Route Slip" export (Excel + PDF), matching Microgenesis's existing paper delivery-route template, so field staff already trained on the paper form recognize the digital equivalent immediately.
 - **`allOpsExport.ts`** — a cross-category "All Operations" export (`AllOpsExportMenu.tsx`) that pulls records across every category into one output, with selectable sort order (nearest/oldest/furthest date), a computed summary block, and CSV / Excel (with a dedicated Summary sheet) / PDF (with a cover page) outputs.
 
+Every export menu also offers a **Status Trail** mode alongside the normal ("Current Status") export — see [Audit Logs → Status Trail Export](#audit-logs) for the full explanation. This is a direct response to a specific request from Logistics: an export where a record that was `Pending` and later became `Scheduled` is counted under both statuses, not just whichever one it holds today.
+
 ### Why it Matters
 
 Under the SharePoint-based workflow, getting a clean, presentable copy of the day's deliveries — for a driver, a manager, or an external partner — meant manually copying rows out of a list view with no consistent formatting, no branding, and no guarantee the copy matched what was actually in the system. Every export in this portal is generated directly from the live database record, so the exported document and the system's data can never silently drift apart.
@@ -320,7 +322,7 @@ Audit logging is centralized through `services/audit.ts`'s `writeAuditLog({recor
 
 ### Why it Matters
 
-This is the direct fix for the first pain point named in [Background](#background): the old SharePoint list had no reliable way to answer "who created or last modified this entry." Every write to a tracked record now produces a durable, queryable `AuditLog` row capturing who made the change, what action it was (CREATE/UPDATE/DELETE), and the before/after values as JSON.
+This is the direct fix for the single most frequently raised complaint in [Background](#background): the old SharePoint list had no reliable way to answer "who created or last modified this entry." Every write to a tracked record now produces a durable, queryable `AuditLog` row capturing who made the change, what action it was (CREATE/UPDATE/DELETE), and the before/after values as JSON — an answer that used to require manually asking around the office is now a click away.
 
 ### Business Benefits
 
@@ -332,6 +334,15 @@ This is the direct fix for the first pain point named in [Background](#backgroun
 ### Department Impact
 
 Admin has exclusive access to the system-wide audit log viewer; any role that can view a specific record can also view that record's own audit history via `GET /api/records/:id/audit` (or `GET /api/skus/:id/audit` for SKUs, Admin only).
+
+### Status Trail Export — answering Logistics' specific request
+
+Logistics specifically asked whether it was possible to export data that reflects a record's full status history, not just its current status — for example, a record that was `Pending` and is now `Scheduled` should be countable under **both** statuses in a report, not just its current one. This is implemented: every export menu in the app (see [Exporting System](#exporting-system)) offers two modes, side by side:
+
+- **Current Status** — the standard export, where each record is counted once, under whatever status it holds right now.
+- **Status Trail** — each record is counted under **every status it has ever held**, reconstructed from that record's `AuditLog` entries (`computeStatusHistoryCounts()` in `src/utils/export.ts`, backed by `GET /api/records/status-history-counts`). A record that moved Pending → Scheduled → Accomplished is counted once in each of those three buckets in Trail mode, answering exactly the "was it ever Pending" question the SharePoint list couldn't.
+
+Status Trail is available in CSV, Excel, Word, and PDF, across every export menu (per-module `ExportMenu.tsx` and the cross-category `AllOpsExportMenu.tsx`), not as a one-off report — it's a first-class option next to the normal export in the same dropdown.
 
 ### Technical Highlights
 
