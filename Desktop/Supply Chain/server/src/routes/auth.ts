@@ -28,7 +28,7 @@ router.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Account is deactivated' });
   }
 
-  const token = signToken({ id: user.id, name: user.name, email: user.email, role: user.role as any });
+  const token = signToken({ id: user.id, name: user.name, email: user.email, role: user.role as Role });
   setSessionCookie(res, token);
   res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
 });

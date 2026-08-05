@@ -32,7 +32,7 @@ export async function notifyAccomplished(record: {
       recipientRole: record.recipientOverride ? 'BILLING' : 'ACCOUNT_MANAGER',
       recipientName: recipientName,
       message: `${subject}\n${text}`,
-      status: result.ok ? 'MOCKED' : 'FAILED'
+      status: !result.ok ? 'FAILED' : result.method === 'mock' ? 'MOCKED' : 'SENT'
     }
   });
 }

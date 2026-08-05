@@ -15,7 +15,9 @@ You can resize `public/microgenesis_logo.png` for the color icon and `public/mic
 
 ### 2. Fill in placeholders
 
-Open `manifest.json` and replace:
+`manifest.json` contains three placeholders that must be resolved before the app can be
+uploaded to Teams. Don't edit `manifest.json` directly — use `build.sh` (step 5), which
+fills them into a generated `manifest.filled.json` and leaves the template untouched.
 
 | Placeholder | Value | Example |
 |---|---|---|
@@ -55,12 +57,36 @@ APP_URL=https://portal.microgenesis.com
 
 ### 5. Package and upload to Teams
 
+Run `build.sh` from the `teams/` directory. It reads `AZURE_CLIENT_ID`, `APP_URL`, and
+`APP_DOMAIN` from your shell environment (or from a `teams/.env` file — gitignored, never
+committed), substitutes them into a generated `manifest.filled.json`, and zips it together
+with the two icons as `microgenesis-teams-app.zip`.
+
 ```bash
 cd teams
-zip -r microgenesis-teams-app.zip manifest.json icon-color.png icon-outline.png
+
+# Option A: export the variables directly
+export AZURE_CLIENT_ID=12345678-abcd-...
+export APP_URL=https://portal.microgenesis.com
+export APP_DOMAIN=portal.microgenesis.com
+./build.sh
+
+# Option B: put them in teams/.env instead (one KEY=value per line)
+cat > .env <<'ENV'
+AZURE_CLIENT_ID=12345678-abcd-...
+APP_URL=https://portal.microgenesis.com
+APP_DOMAIN=portal.microgenesis.com
+ENV
+./build.sh
 ```
 
-Then in **Teams Admin Center** → Manage apps → Upload custom app → upload the zip file.
+The script fails fast with a clear message if any variable is missing or an icon file is
+absent. It never modifies `manifest.json` — the filled copy and the zip are both generated,
+gitignored artifacts you can safely regenerate any time the placeholders change (e.g.
+switching from the Render staging URL to the production domain).
+
+Then in **Teams Admin Center** → Manage apps → Upload custom app → upload
+`microgenesis-teams-app.zip`.
 
 ### 6. Verify
 
