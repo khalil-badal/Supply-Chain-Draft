@@ -141,20 +141,17 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
     <div className="min-h-screen w-full flex" id="login-screen">
 
       {/* ── LEFT PANEL ─────────────────────────────────── */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-[#1F3864] via-[#1a4f8a] to-[#0078C1] flex-col items-center justify-center px-12">
+      <div className="hidden lg:flex lg:w-2/3 relative overflow-hidden bg-gradient-to-br from-[#1F3864] via-[#1a4f8a] to-[#0078C1] flex-col items-center justify-center px-12">
         {/* Glow decorations */}
         <div className="w-96 h-96 bg-white/5 rounded-full blur-3xl absolute -top-20 -right-20 pointer-events-none" />
         <div className="w-80 h-80 bg-[#0078C1]/20 rounded-full blur-3xl absolute -bottom-16 -left-16 pointer-events-none" />
 
         {/* Logo + text */}
         <div className="relative z-10 flex flex-col items-center text-center">
-          <img src="/microgenesis_logo_white.png" alt="Microgenesis" className="w-52" />
+          <img src="/microgenesis_logo_white.png" alt="Microgenesis - Making IT Easy For You!" className="w-72" />
           <h1 className="text-4xl font-black text-white tracking-tight leading-tight mt-8">
-            Supply Chain<br />Portal
+            Supply Chain Portal
           </h1>
-          <p className="text-base font-medium text-white/60 tracking-wide mt-3">
-            Making It Easy For You!
-          </p>
         </div>
 
         {/* Bottom attribution */}
@@ -164,7 +161,7 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
       </div>
 
       {/* ── RIGHT PANEL ────────────────────────────────── */}
-      <div className="w-full lg:w-1/2 bg-white flex flex-col items-center justify-center px-10 overflow-y-auto min-h-screen">
+      <div className="w-full lg:w-1/3 bg-white flex flex-col items-center justify-center px-10 overflow-y-auto min-h-screen">
         <div className="w-full max-w-sm">
 
           {/* Mobile-only logo (left panel is hidden on mobile) */}
