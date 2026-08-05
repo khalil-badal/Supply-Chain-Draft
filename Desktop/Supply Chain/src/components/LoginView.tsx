@@ -138,18 +138,18 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
   const isLoading = loading || ssoLoading;
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#F8F9FB] px-4" id="login-screen">
-      <div className="w-full max-w-sm">
-        <div className="flex flex-col items-center mb-6">
-          <div className="w-40 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#F8F9FB] px-6" id="login-screen">
+      <div className="w-full max-w-md">
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-56 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <img src="/microgenesis_logo.png" alt="Microgenesis - Making It Easy For You!" className="w-full h-auto" />
           </div>
-          <h1 className="text-lg font-black text-[#1F3864] mt-4 text-center">Supply Chain Portal</h1>
-          <p className="text-xs text-slate-500 text-center mt-1">Sign in with your Microgenesis account to continue.</p>
+          <h1 className="text-2xl font-black text-[#1F3864] mt-5 text-center">Supply Chain Portal</h1>
+          <p className="text-sm text-slate-500 text-center mt-2">Sign in with your Microgenesis account to continue.</p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg px-3 py-2 mb-3" id="login-error">
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm font-semibold rounded-lg px-4 py-3 mb-4" id="login-error">
             {error}
           </div>
         )}
@@ -158,11 +158,11 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
         <button
           onClick={handleMicrosoftLogin}
           disabled={isLoading}
-          className="w-full bg-white hover:bg-slate-50 border border-[#8C8C8C] text-[#2F2F2F] font-semibold text-sm py-2.5 rounded-lg flex items-center justify-center gap-3 transition-all cursor-pointer disabled:opacity-60 shadow-sm mb-3"
+          className="w-full bg-white hover:bg-slate-50 border border-[#8C8C8C] text-[#2F2F2F] font-semibold text-base py-3.5 rounded-xl flex items-center justify-center gap-3 transition-all cursor-pointer disabled:opacity-60 shadow-sm mb-4"
           id="microsoft-login-btn"
         >
           {ssoLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
           ) : (
             <MicrosoftLogo />
           )}
@@ -173,25 +173,25 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
         {!showEmailForm && (
           <button
             onClick={() => setShowEmailForm(true)}
-            className="w-full flex items-center justify-center gap-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 py-2 transition-colors cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 text-sm font-bold text-slate-400 hover:text-slate-600 py-2.5 transition-colors cursor-pointer"
           >
-            <Mail className="w-3.5 h-3.5" />
+            <Mail className="w-4 h-4" />
             Sign in with email instead
-            <ChevronDown className="w-3 h-3" />
+            <ChevronDown className="w-4 h-4" />
           </button>
         )}
 
         {/* Email + password form */}
         {showEmailForm && (
-          <form onSubmit={handleSubmit} className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 space-y-4" id="login-form">
+          <form onSubmit={handleSubmit} className="bg-white border border-slate-200 shadow-sm rounded-xl p-7 space-y-5" id="login-form">
             <div className="flex items-center gap-3 mb-1">
               <div className="h-px flex-1 bg-slate-200" />
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Login</span>
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Email Login</span>
               <div className="h-px flex-1 bg-slate-200" />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">Email</label>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Email</label>
               <input
                 type="email"
                 required
@@ -199,19 +199,19 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@microgenesis.com"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-hidden focus:ring-1 focus:ring-[#0078C1]"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:outline-hidden focus:ring-1 focus:ring-[#0078C1]"
                 id="login-email"
               />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700">Password</label>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Password</label>
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-hidden focus:ring-1 focus:ring-[#0078C1]"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:outline-hidden focus:ring-1 focus:ring-[#0078C1]"
                 id="login-password"
               />
             </div>
@@ -219,9 +219,9 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#1F3864] hover:bg-blue-900 disabled:opacity-60 text-white font-bold uppercase tracking-wider text-xs py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="w-full bg-[#1F3864] hover:bg-blue-900 disabled:opacity-60 text-white font-bold uppercase tracking-wider text-sm py-3 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5" />}
               Sign In
             </button>
           </form>
@@ -229,28 +229,28 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
 
         {/* Quick Switch — demo accounts (dev only) */}
         {SHOW_DEMO && (
-          <div className="mt-4" id="quick-switch-panel">
+          <div className="mt-5" id="quick-switch-panel">
             <div className="flex items-center gap-3 mb-3">
               <div className="h-px flex-1 bg-slate-200" />
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quick Switch</span>
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Quick Switch</span>
               <div className="h-px flex-1 bg-slate-200" />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2.5">
               {DEMO_ACCOUNTS.map(account => (
                 <button
                   key={account.email}
                   onClick={() => handleQuickLogin(account.email, account.password)}
                   disabled={isLoading}
-                  className="bg-white border border-slate-200 rounded-xl p-3 text-left flex items-start gap-2.5 hover:border-[#0078C1] hover:shadow-sm transition-all cursor-pointer disabled:opacity-50 group"
+                  className="bg-white border border-slate-200 rounded-xl p-3.5 text-left flex items-start gap-3 hover:border-[#0078C1] hover:shadow-sm transition-all cursor-pointer disabled:opacity-50 group"
                   title={`Sign in as ${account.name}`}
                 >
-                  <div className={`w-8 h-8 rounded-full ${account.avatarBg} flex items-center justify-center text-white text-[11px] font-black shrink-0`}>
+                  <div className={`w-9 h-9 rounded-full ${account.avatarBg} flex items-center justify-center text-white text-xs font-black shrink-0`}>
                     {account.initials}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-800 truncate leading-tight">{account.name}</p>
-                    <span className={`inline-block mt-1 px-1.5 py-0.5 rounded border text-[9px] font-bold tracking-wide ${account.roleBadge}`}>
+                    <p className="text-sm font-bold text-slate-800 truncate leading-tight">{account.name}</p>
+                    <span className={`inline-block mt-1 px-2 py-0.5 rounded border text-[10px] font-bold tracking-wide ${account.roleBadge}`}>
                       {account.role}
                     </span>
                   </div>
