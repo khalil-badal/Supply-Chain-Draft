@@ -135,7 +135,7 @@ router.get('/microsoft/callback', async (req: Request, res: Response) => {
 
     // Look up user: prefer microsoftOid match, then email match
     let user = oid
-      ? await prisma.user.findUnique({ where: { microsoftOid: oid } as any })
+      ? await prisma.user.findUnique({ where: { microsoftOid: oid } })
       : null;
 
     if (!user) {
@@ -156,12 +156,12 @@ router.get('/microsoft/callback', async (req: Request, res: Response) => {
           role: 'SALES_COORDINATOR',
           isActive: true,
           microsoftOid: oid || null,
-        } as any,
+        },
       });
-    } else if (oid && !(user as any).microsoftOid) {
+    } else if (oid && !user.microsoftOid) {
       await prisma.user.update({
         where: { id: user.id },
-        data: { microsoftOid: oid } as any,
+        data: { microsoftOid: oid },
       });
     }
 

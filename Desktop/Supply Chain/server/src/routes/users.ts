@@ -21,6 +21,7 @@ router.get('/', requireAuth, requireRole('ADMIN'), async (_req: Request, res: Re
     email: u.email,
     role: u.role,
     is_active: u.isActive,
+    microsoft_linked: !!u.microsoftOid,
     created_at: u.createdAt
   })));
 });
@@ -44,7 +45,43 @@ router.post('/', requireAuth, requireRole('ADMIN'), async (req: Request, res: Re
     name: created.name,
     email: created.email,
     role: created.role,
-    is_active: created.isActive
+    is_active: created.isActive,
+    microsoft_linked: false,
+    created_at: created.createdAt,
+  });
+});
+
+// Update user details — ADMIN only.
+router.patch('/:id', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { name, email, role } = req.body ?? {};
+
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const validRoles = ['SALES_COORDINATOR', 'LOGISTICS', 'TASS', 'ADMIN', 'DRIVER'];
+  if (role && !validRoles.includes(role)) {
+    return res.status(400).json({ error: `role must be one of: ${validRoles.join(', ')}` });
+  }
+
+  const data: Record<string, unknown> = {};
+  if (name) data.name = name;
+  if (email) data.email = String(email).toLowerCase();
+  if (role) data.role = role;
+
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({ error: 'At least one field (name, email, role) is required' });
+  }
+
+  const updated = await prisma.user.update({ where: { id }, data });
+  res.json({
+    id: updated.id,
+    name: updated.name,
+    email: updated.email,
+    role: updated.role,
+    is_active: updated.isActive,
+    microsoft_linked: !!updated.microsoftOid,
+    created_at: updated.createdAt,
   });
 });
 
@@ -71,7 +108,9 @@ router.patch('/:id/deactivate', requireAuth, requireRole('ADMIN'), async (req: R
     name: updated.name,
     email: updated.email,
     role: updated.role,
-    is_active: updated.isActive
+    is_active: updated.isActive,
+    microsoft_linked: !!updated.microsoftOid,
+    created_at: updated.createdAt,
   });
 });
 
@@ -92,7 +131,9 @@ router.patch('/:id/activate', requireAuth, requireRole('ADMIN'), async (req: Req
     name: updated.name,
     email: updated.email,
     role: updated.role,
-    is_active: updated.isActive
+    is_active: updated.isActive,
+    microsoft_linked: !!updated.microsoftOid,
+    created_at: updated.createdAt,
   });
 });
 

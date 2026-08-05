@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ClipboardList, UserX, Plus, ChevronLeft, ChevronRight, Loader2, Check, ShieldCheck, RotateCcw, X } from 'lucide-react';
-import { api, ApiUserAdmin, ApiAdminAuditEntry, ApiError } from '../api';
+import { Users, ClipboardList, UserX, Plus, ChevronLeft, ChevronRight, Loader2, Check, ShieldCheck, RotateCcw, X, Settings2, Send, Pencil, Link2 } from 'lucide-react';
+import { api, ApiUserAdmin, ApiAdminAuditEntry, ApiIntegrationStatus, ApiError } from '../api';
 
-type Tab = 'users' | 'audit';
+type Tab = 'users' | 'audit' | 'integrations';
 
 const ROLE_OPTIONS = ['SALES_COORDINATOR', 'LOGISTICS', 'TASS', 'ADMIN'] as const;
 const ROLE_LABELS: Record<string, string> = {
@@ -217,6 +217,9 @@ export default function AdminPanel() {
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [activatingId, setActivatingId] = useState<string | null>(null);
   const [openPermissionsUserId, setOpenPermissionsUserId] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', email: '', role: '' });
+  const [editLoading, setEditLoading] = useState(false);
 
   const loadUsers = async () => {
     setUsersLoading(true);
@@ -276,6 +279,60 @@ export default function AdminPanel() {
       alert(err instanceof ApiError ? err.message : 'Failed to activate user');
     } finally {
       setActivatingId(null);
+    }
+  };
+
+  const startEdit = (u: ApiUserAdmin) => {
+    setEditingUserId(u.id);
+    setEditForm({ name: u.name, email: u.email, role: u.role });
+  };
+
+  const handleEditSave = async (userId: string) => {
+    setEditLoading(true);
+    try {
+      const updated = await api.updateUser(userId, editForm);
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      setEditingUserId(null);
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : 'Failed to update user');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // ── Integrations ──────────────────────────────────────────────────────────
+  const [integrationStatus, setIntegrationStatus] = useState<ApiIntegrationStatus | null>(null);
+  const [integrationLoading, setIntegrationLoading] = useState(false);
+  const [testEmailAddr, setTestEmailAddr] = useState('');
+  const [testEmailResult, setTestEmailResult] = useState<{ ok: boolean; method: string; error?: string | null } | null>(null);
+  const [testEmailLoading, setTestEmailLoading] = useState(false);
+
+  const loadIntegrationStatus = async () => {
+    setIntegrationLoading(true);
+    try {
+      const status = await api.getIntegrationStatus();
+      setIntegrationStatus(status);
+    } catch {
+      // ignore
+    } finally {
+      setIntegrationLoading(false);
+    }
+  };
+
+  useEffect(() => { if (tab === 'integrations') loadIntegrationStatus(); }, [tab]);
+
+  const handleTestEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testEmailAddr.trim()) return;
+    setTestEmailLoading(true);
+    setTestEmailResult(null);
+    try {
+      const result = await api.sendTestEmail(testEmailAddr.trim());
+      setTestEmailResult(result);
+    } catch (err) {
+      setTestEmailResult({ ok: false, method: 'unknown', error: err instanceof ApiError ? err.message : 'Failed to send' });
+    } finally {
+      setTestEmailLoading(false);
     }
   };
 
@@ -345,6 +402,9 @@ export default function AdminPanel() {
         </button>
         <button className={tabClass('audit')} onClick={() => setTab('audit')}>
           <span className="flex items-center gap-1.5"><ClipboardList className="w-3.5 h-3.5" /> System Audit Log</span>
+        </button>
+        <button className={tabClass('integrations')} onClick={() => setTab('integrations')}>
+          <span className="flex items-center gap-1.5"><Settings2 className="w-3.5 h-3.5" /> Integrations</span>
         </button>
       </div>
 
@@ -437,22 +497,53 @@ export default function AdminPanel() {
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">Email</th>
                     <th className="px-4 py-3">Role</th>
+                    <th className="px-4 py-3 text-center">Auth</th>
                     <th className="px-4 py-3 text-center">Status</th>
                     <th className="px-4 py-3 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {users.length === 0 ? (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">No users found.</td></tr>
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No users found.</td></tr>
                   ) : users.map(u => (
                     <React.Fragment key={u.id}>
                       <tr className="hover:bg-slate-50 transition-all">
-                        <td className="px-4 py-3 font-bold text-slate-900">{u.name}</td>
-                        <td className="px-4 py-3 text-slate-600 font-mono text-[10px]">{u.email}</td>
                         <td className="px-4 py-3">
-                          <span className="bg-blue-50 text-blue-700 border border-blue-100 text-[10px] px-2 py-0.5 rounded-full font-semibold">
-                            {ROLE_LABELS[u.role] ?? u.role}
-                          </span>
+                          {editingUserId === u.id ? (
+                            <input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                              className="w-full px-2 py-1 border border-slate-300 rounded text-xs" />
+                          ) : (
+                            <span className="font-bold text-slate-900">{u.name}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {editingUserId === u.id ? (
+                            <input value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
+                              className="w-full px-2 py-1 border border-slate-300 rounded text-[10px] font-mono" />
+                          ) : (
+                            <span className="text-slate-600 font-mono text-[10px]">{u.email}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {editingUserId === u.id ? (
+                            <select value={editForm.role} onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}
+                              className="px-2 py-1 border border-slate-300 rounded text-[10px] bg-white">
+                              {ROLE_OPTIONS.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                            </select>
+                          ) : (
+                            <span className="bg-blue-50 text-blue-700 border border-blue-100 text-[10px] px-2 py-0.5 rounded-full font-semibold">
+                              {ROLE_LABELS[u.role] ?? u.role}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {u.microsoft_linked ? (
+                            <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] px-2 py-0.5 rounded-full font-semibold">
+                              <Link2 className="w-3 h-3" /> Microsoft
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-semibold">Email only</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {u.is_active
@@ -462,43 +553,62 @@ export default function AdminPanel() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => setOpenPermissionsUserId(prev => prev === u.id ? null : u.id)}
-                              className={`flex items-center gap-1 font-bold text-[10px] uppercase tracking-wide cursor-pointer ${openPermissionsUserId === u.id ? 'text-[#0078C1]' : 'text-slate-500 hover:text-[#0078C1]'}`}
-                            >
-                              <ShieldCheck className="w-3 h-3" /> Manage Access
-                            </button>
-                            {u.is_active ? (
-                              <button
-                                onClick={() => handleDeactivate(u)}
-                                disabled={deactivatingId === u.id}
-                                className="flex items-center gap-1 text-red-600 hover:text-red-800 font-bold text-[10px] uppercase tracking-wide disabled:opacity-50 cursor-pointer"
-                              >
-                                {deactivatingId === u.id
-                                  ? <Loader2 className="w-3 h-3 animate-spin" />
-                                  : <UserX className="w-3 h-3" />
-                                }
-                                Deactivate
-                              </button>
+                            {editingUserId === u.id ? (
+                              <>
+                                <button onClick={() => handleEditSave(u.id)} disabled={editLoading}
+                                  className="flex items-center gap-1 text-emerald-600 hover:text-emerald-800 font-bold text-[10px] uppercase tracking-wide disabled:opacity-50 cursor-pointer">
+                                  {editLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Save
+                                </button>
+                                <button onClick={() => setEditingUserId(null)}
+                                  className="flex items-center gap-1 text-slate-500 hover:text-slate-700 font-bold text-[10px] uppercase tracking-wide cursor-pointer">
+                                  <X className="w-3 h-3" /> Cancel
+                                </button>
+                              </>
                             ) : (
-                              <button
-                                onClick={() => handleActivate(u)}
-                                disabled={activatingId === u.id}
-                                className="flex items-center gap-1 text-emerald-600 hover:text-emerald-800 font-bold text-[10px] uppercase tracking-wide disabled:opacity-50 cursor-pointer"
-                              >
-                                {activatingId === u.id
-                                  ? <Loader2 className="w-3 h-3 animate-spin" />
-                                  : <Check className="w-3 h-3" />
-                                }
-                                Activate
-                              </button>
+                              <>
+                                <button onClick={() => startEdit(u)}
+                                  className="flex items-center gap-1 text-slate-500 hover:text-[#0078C1] font-bold text-[10px] uppercase tracking-wide cursor-pointer">
+                                  <Pencil className="w-3 h-3" /> Edit
+                                </button>
+                                <button
+                                  onClick={() => setOpenPermissionsUserId(prev => prev === u.id ? null : u.id)}
+                                  className={`flex items-center gap-1 font-bold text-[10px] uppercase tracking-wide cursor-pointer ${openPermissionsUserId === u.id ? 'text-[#0078C1]' : 'text-slate-500 hover:text-[#0078C1]'}`}
+                                >
+                                  <ShieldCheck className="w-3 h-3" /> Access
+                                </button>
+                                {u.is_active ? (
+                                  <button
+                                    onClick={() => handleDeactivate(u)}
+                                    disabled={deactivatingId === u.id}
+                                    className="flex items-center gap-1 text-red-600 hover:text-red-800 font-bold text-[10px] uppercase tracking-wide disabled:opacity-50 cursor-pointer"
+                                  >
+                                    {deactivatingId === u.id
+                                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                                      : <UserX className="w-3 h-3" />
+                                    }
+                                    Deactivate
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleActivate(u)}
+                                    disabled={activatingId === u.id}
+                                    className="flex items-center gap-1 text-emerald-600 hover:text-emerald-800 font-bold text-[10px] uppercase tracking-wide disabled:opacity-50 cursor-pointer"
+                                  >
+                                    {activatingId === u.id
+                                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                                      : <Check className="w-3 h-3" />
+                                    }
+                                    Activate
+                                  </button>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>
                       </tr>
                       {openPermissionsUserId === u.id && (
                         <tr>
-                          <td colSpan={5} className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+                          <td colSpan={6} className="px-4 py-3 bg-slate-50 border-b border-slate-100">
                             <PermissionsPanel
                               user={u}
                               onClose={() => setOpenPermissionsUserId(null)}
@@ -511,6 +621,108 @@ export default function AdminPanel() {
                 </tbody>
               </table>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Tab 3: Integrations ── */}
+      {tab === 'integrations' && (
+        <div className="space-y-5">
+          {integrationLoading ? (
+            <div className="flex items-center justify-center py-12 text-slate-400">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading integration status...
+            </div>
+          ) : integrationStatus && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Azure SSO */}
+                <div className={`bg-white border rounded-xl p-5 ${integrationStatus.azure_sso.configured ? 'border-emerald-200' : 'border-amber-200'}`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className={`w-2.5 h-2.5 rounded-full ${integrationStatus.azure_sso.configured ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                    <h4 className="text-sm font-bold text-slate-800">Azure AD SSO</h4>
+                  </div>
+                  {integrationStatus.azure_sso.configured ? (
+                    <div className="space-y-1.5 text-xs text-slate-600">
+                      <p><span className="font-semibold text-slate-700">Tenant:</span> {integrationStatus.azure_sso.tenant}</p>
+                      <p className="truncate"><span className="font-semibold text-slate-700">Redirect:</span> {integrationStatus.azure_sso.redirect_uri}</p>
+                      <p className="text-emerald-600 font-semibold mt-2">Configured and active</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-amber-600 font-semibold">Not configured — set AZURE_CLIENT_ID and AZURE_CLIENT_SECRET environment variables</p>
+                  )}
+                </div>
+
+                {/* Email */}
+                <div className="bg-white border border-slate-200 rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className={`w-2.5 h-2.5 rounded-full ${integrationStatus.email.method === 'mock' ? 'bg-amber-400' : 'bg-emerald-500'}`} />
+                    <h4 className="text-sm font-bold text-slate-800">Email Delivery</h4>
+                  </div>
+                  <div className="space-y-1.5 text-xs text-slate-600">
+                    <p><span className="font-semibold text-slate-700">Method:</span> <span className={`font-bold uppercase ${integrationStatus.email.method === 'mock' ? 'text-amber-600' : 'text-emerald-600'}`}>{integrationStatus.email.method}</span></p>
+                    {integrationStatus.email.smtp_host && <p><span className="font-semibold text-slate-700">SMTP Host:</span> {integrationStatus.email.smtp_host}</p>}
+                    {integrationStatus.email.from && <p><span className="font-semibold text-slate-700">From:</span> {integrationStatus.email.from}</p>}
+                    {integrationStatus.email.method === 'mock' && <p className="text-amber-600 font-semibold mt-2">Emails logged to console only</p>}
+                  </div>
+                </div>
+
+                {/* Users */}
+                <div className="bg-white border border-slate-200 rounded-xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                    <h4 className="text-sm font-bold text-slate-800">User Accounts</h4>
+                  </div>
+                  <div className="space-y-1.5 text-xs text-slate-600">
+                    <p><span className="font-semibold text-slate-700">Total:</span> {integrationStatus.users.total}</p>
+                    <p><span className="font-semibold text-slate-700">Active:</span> {integrationStatus.users.active}</p>
+                    <p><span className="font-semibold text-slate-700">Microsoft-linked:</span> {integrationStatus.users.microsoft_linked}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Environment */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                <h4 className="text-sm font-bold text-slate-800 mb-3">Environment</h4>
+                <div className="flex flex-wrap gap-4 text-xs text-slate-600">
+                  <p><span className="font-semibold text-slate-700">App URL:</span> {integrationStatus.app_url}</p>
+                  <p><span className="font-semibold text-slate-700">NODE_ENV:</span> <span className="font-mono bg-slate-200 px-1.5 py-0.5 rounded">{integrationStatus.node_env}</span></p>
+                </div>
+              </div>
+
+              {/* Test Email */}
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
+                <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                  <Send className="w-4 h-4 text-[#0078C1]" /> Send Test Email
+                </h4>
+                <form onSubmit={handleTestEmail} className="flex items-end gap-3">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Recipient</label>
+                    <input
+                      type="email" required value={testEmailAddr}
+                      onChange={e => setTestEmailAddr(e.target.value)}
+                      placeholder="your-email@example.com"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#0078C1]"
+                    />
+                  </div>
+                  <button type="submit" disabled={testEmailLoading}
+                    className="px-5 py-2 bg-[#0078C1] hover:bg-[#1F3864] text-white font-bold rounded-lg text-[11px] uppercase flex items-center gap-1.5 disabled:opacity-60 cursor-pointer whitespace-nowrap">
+                    {testEmailLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                    Send Test
+                  </button>
+                </form>
+                {testEmailResult && (
+                  <div className={`mt-3 px-4 py-3 rounded-lg text-xs font-semibold border ${testEmailResult.ok
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : 'bg-red-50 border-red-200 text-red-700'
+                  }`}>
+                    {testEmailResult.ok
+                      ? `Test email sent successfully via ${testEmailResult.method.toUpperCase()}`
+                      : `Failed to send: ${testEmailResult.error || 'Unknown error'}`
+                    }
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       )}

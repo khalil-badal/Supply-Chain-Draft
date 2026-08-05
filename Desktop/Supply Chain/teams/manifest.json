@@ -1,0 +1,49 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "{{AZURE_CLIENT_ID}}",
+  "developer": {
+    "name": "Microgenesis Business Systems Inc.",
+    "websiteUrl": "https://microgenesis.com",
+    "privacyUrl": "https://microgenesis.com/privacy",
+    "termsOfUseUrl": "https://microgenesis.com/terms"
+  },
+  "name": {
+    "short": "Supply Chain Portal",
+    "full": "Microgenesis Supply Chain Portal"
+  },
+  "description": {
+    "short": "Track deliveries, RMA, collections, and procurement in one place.",
+    "full": "The Microgenesis Supply Chain Portal is a real-time logistics management system for coordinating deliveries, returns (RMA), accounting collections, procurement pick-ups, and sales orders. Role-based dashboards give Sales Coordinators, Logistics staff, TASS, Drivers, and Admins exactly the view they need."
+  },
+  "icons": {
+    "outline": "icon-outline.png",
+    "color": "icon-color.png"
+  },
+  "accentColor": "#1F3864",
+  "staticTabs": [
+    {
+      "entityId": "portal",
+      "name": "Supply Chain Portal",
+      "contentUrl": "{{APP_URL}}?teams=1",
+      "websiteUrl": "{{APP_URL}}",
+      "scopes": ["personal"]
+    }
+  ],
+  "configurableTabs": [
+    {
+      "configurationUrl": "{{APP_URL}}?teams=1&config=1",
+      "canUpdateConfiguration": false,
+      "scopes": ["team", "groupChat"]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": [
+    "{{APP_DOMAIN}}"
+  ],
+  "webApplicationInfo": {
+    "id": "{{AZURE_CLIENT_ID}}",
+    "resource": "api://{{APP_DOMAIN}}/{{AZURE_CLIENT_ID}}"
+  }
+}

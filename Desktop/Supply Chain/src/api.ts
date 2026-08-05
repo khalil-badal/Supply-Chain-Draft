@@ -53,7 +53,22 @@ export interface ApiUserAdmin {
   email: string;
   role: 'SALES_COORDINATOR' | 'LOGISTICS' | 'TASS' | 'ADMIN' | 'DRIVER';
   is_active: boolean;
+  microsoft_linked: boolean;
   created_at: string;
+}
+
+export interface ApiIntegrationStatus {
+  azure_sso: { configured: boolean; tenant: string | null; redirect_uri: string | null };
+  email: { method: 'graph' | 'smtp' | 'mock'; smtp_host: string | null; from: string | null };
+  users: { total: number; active: number; microsoft_linked: number };
+  app_url: string;
+  node_env: string;
+}
+
+export interface ApiTestEmailResult {
+  ok: boolean;
+  method: 'graph' | 'smtp' | 'mock';
+  error: string | null;
 }
 
 export interface ApiCompany {
@@ -359,6 +374,8 @@ export const api = {
   getUsers: () => request<ApiUserAdmin[]>('/users'),
   createUser: (data: { name: string; email: string; password: string; role: string }) =>
     request<ApiUserAdmin>('/users', { method: 'POST', body: JSON.stringify(data) }),
+  updateUser: (id: string, data: { name?: string; email?: string; role?: string }) =>
+    request<ApiUserAdmin>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deactivateUser: (id: string) =>
     request<ApiUserAdmin>(`/users/${id}/deactivate`, { method: 'PATCH' }),
   activateUser: (id: string) =>
@@ -370,6 +387,11 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ permissions })
     }),
+
+  // Admin integration diagnostics
+  getIntegrationStatus: () => request<ApiIntegrationStatus>('/admin/integration-status'),
+  sendTestEmail: (to: string) =>
+    request<ApiTestEmailResult>('/admin/test-email', { method: 'POST', body: JSON.stringify({ to }) }),
 
   // Admin audit log
   getAuditLog: (params: { page?: number; limit?: number; action?: string; from?: string; to?: string; userId?: string }) => {
