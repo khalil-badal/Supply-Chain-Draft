@@ -15,6 +15,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { DeliveryRecord, DeliveryStatus, OutputActionConfig, OutputActionTrigger } from '../types';
+import { api } from '../api';
 import { DRIVERS, VEHICLES, DRIVER_ASSISTANTS } from '../data';
 import { getOutputTrigger, runOutputActions } from '../outputActions';
 import { screenKeyForCategory } from '../screenRouting';
@@ -57,7 +58,7 @@ export default function DriverView({
 
   const actorLabel = (driver: string) => `${currentUserName} (Logistics) on behalf of ${driver}`;
 
-  const applyStatus = (
+  const applyStatus = async (
     rec: DeliveryRecord,
     status: DeliveryStatus,
     remarks: string,
@@ -66,7 +67,7 @@ export default function DriverView({
     const now = new Date().toISOString();
     const updates: any = {
       status,
-      status_remarks: remarks,  // handleUpdateRecord reads status_remarks for patchStatus
+      status_remarks: remarks,
       modified_by: actorLabel(rec.driver),
       modified_at: now,
       ...(extra ?? {})
@@ -74,7 +75,9 @@ export default function DriverView({
 
     const trigger = getOutputTrigger(rec.category, status);
     if (trigger) {
-      const result = runOutputActions(trigger, outputActionConfigs[trigger], { amName: rec.account_manager, at: now });
+      const result = await runOutputActions(trigger, outputActionConfigs[trigger], {
+        amName: rec.account_manager, at: now, recordId: rec.id, api,
+      });
       updates.output_actions_log = [...result.newEntries, ...rec.output_actions_log];
       updates.email_notification_sent = result.emailSent;
     }

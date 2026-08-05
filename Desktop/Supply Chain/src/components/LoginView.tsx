@@ -1,5 +1,5 @@
-import { FormEvent, useState } from 'react';
-import { LogIn, Loader2 } from 'lucide-react';
+import { FormEvent, useState, useEffect } from 'react';
+import { LogIn, Loader2, Mail, ChevronDown } from 'lucide-react';
 import { api, ApiUser } from '../api';
 
 interface LoginViewProps {
@@ -45,11 +45,54 @@ const DEMO_ACCOUNTS = [
   },
 ] as const;
 
+const SHOW_DEMO = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === 'true';
+
+function MicrosoftLogo() {
+  return (
+    <svg width="21" height="21" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+      <rect x="1" y="1" width="9" height="9" fill="#F25022" />
+      <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
+      <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
+      <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+    </svg>
+  );
+}
+
 export default function LoginView({ onLoggedIn }: LoginViewProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [ssoLoading, setSsoLoading] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [ssoConfigured, setSsoConfigured] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/microsoft/status', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { configured: false })
+      .then(data => setSsoConfigured(data.configured))
+      .catch(() => setSsoConfigured(false));
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errParam = params.get('error');
+    if (errParam === 'account_deactivated') {
+      setError('Your Microsoft account is not authorized. Contact your administrator.');
+      window.history.replaceState({}, '', '/');
+    } else if (errParam === 'sso_failed') {
+      setError('Microsoft login failed. Please try again or use email login.');
+      window.history.replaceState({}, '', '/');
+    } else if (errParam === 'sso_not_configured') {
+      setError('Microsoft login is not configured. Use email login.');
+      setShowEmailForm(true);
+      window.history.replaceState({}, '', '/');
+    } else if (errParam === 'sso_no_email') {
+      setError('Could not retrieve email from your Microsoft account. Use email login.');
+      setShowEmailForm(true);
+      window.history.replaceState({}, '', '/');
+    }
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -62,6 +105,28 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
       setError(err?.message || 'Login failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMicrosoftLogin = async () => {
+    setError(null);
+    setSsoLoading(true);
+    try {
+      const res = await fetch('/api/auth/microsoft', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setError(data.error || 'Microsoft login is not configured. Use email login.');
+        setShowEmailForm(true);
+        setSsoLoading(false);
+      }
+    } catch {
+      setError('Could not connect to authentication service.');
+      setSsoLoading(false);
     }
   };
 
@@ -78,6 +143,8 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
     }
   };
 
+  const isLoading = loading || ssoLoading;
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#F8F9FB] px-4" id="login-screen">
       <div className="w-full max-w-sm">
@@ -89,79 +156,119 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
           <p className="text-xs text-slate-500 text-center mt-1">Sign in with your Microgenesis account to continue.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 space-y-4" id="login-form">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">Email</label>
-            <input
-              type="email"
-              required
-              autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@microgenesis.com"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-hidden focus:ring-1 focus:ring-[#0078C1]"
-              id="login-email"
-            />
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg px-3 py-2 mb-3" id="login-error">
+            {error}
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-hidden focus:ring-1 focus:ring-[#0078C1]"
-              id="login-password"
-            />
-          </div>
+        )}
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg px-3 py-2" id="login-error">
-              {error}
-            </div>
-          )}
-
+        {/* Microsoft SSO button */}
+        {ssoConfigured !== false && (
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#1F3864] hover:bg-blue-900 disabled:opacity-60 text-white font-bold uppercase tracking-wider text-xs py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+            onClick={handleMicrosoftLogin}
+            disabled={isLoading}
+            className="w-full bg-white hover:bg-slate-50 border border-[#8C8C8C] text-[#2F2F2F] font-semibold text-sm py-2.5 rounded-lg flex items-center justify-center gap-3 transition-all cursor-pointer disabled:opacity-60 shadow-sm mb-3"
+            id="microsoft-login-btn"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
-            Sign In
+            {ssoLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+            ) : (
+              <MicrosoftLogo />
+            )}
+            {ssoLoading ? 'Redirecting to Microsoft…' : 'Sign in with Microsoft'}
           </button>
-        </form>
+        )}
 
-        {/* Quick Switch — demo accounts */}
-        <div className="mt-4" id="quick-switch-panel">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-px flex-1 bg-slate-200" />
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quick Switch</span>
-            <div className="h-px flex-1 bg-slate-200" />
-          </div>
+        {/* Toggle for email login */}
+        {!showEmailForm && (
+          <button
+            onClick={() => setShowEmailForm(true)}
+            className="w-full flex items-center justify-center gap-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 py-2 transition-colors cursor-pointer"
+          >
+            <Mail className="w-3.5 h-3.5" />
+            Sign in with email instead
+            <ChevronDown className="w-3 h-3" />
+          </button>
+        )}
 
-          <div className="grid grid-cols-2 gap-2">
-            {DEMO_ACCOUNTS.map(account => (
-              <button
-                key={account.email}
-                onClick={() => handleQuickLogin(account.email, account.password)}
-                disabled={loading}
-                className="bg-white border border-slate-200 rounded-xl p-3 text-left flex items-start gap-2.5 hover:border-[#0078C1] hover:shadow-sm transition-all cursor-pointer disabled:opacity-50 group"
-                title={`Sign in as ${account.name}`}
-              >
-                <div className={`w-8 h-8 rounded-full ${account.avatarBg} flex items-center justify-center text-white text-[11px] font-black shrink-0`}>
-                  {account.initials}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-slate-800 truncate leading-tight">{account.name}</p>
-                  <span className={`inline-block mt-1 px-1.5 py-0.5 rounded border text-[9px] font-bold tracking-wide ${account.roleBadge}`}>
-                    {account.role}
-                  </span>
-                </div>
-              </button>
-            ))}
+        {/* Email + password form */}
+        {showEmailForm && (
+          <form onSubmit={handleSubmit} className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 space-y-4" id="login-form">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Login</span>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">Email</label>
+              <input
+                type="email"
+                required
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@microgenesis.com"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-hidden focus:ring-1 focus:ring-[#0078C1]"
+                id="login-email"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700">Password</label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-hidden focus:ring-1 focus:ring-[#0078C1]"
+                id="login-password"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-[#1F3864] hover:bg-blue-900 disabled:opacity-60 text-white font-bold uppercase tracking-wider text-xs py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+              Sign In
+            </button>
+          </form>
+        )}
+
+        {/* Quick Switch — demo accounts (dev only) */}
+        {SHOW_DEMO && (
+          <div className="mt-4" id="quick-switch-panel">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quick Switch</span>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {DEMO_ACCOUNTS.map(account => (
+                <button
+                  key={account.email}
+                  onClick={() => handleQuickLogin(account.email, account.password)}
+                  disabled={isLoading}
+                  className="bg-white border border-slate-200 rounded-xl p-3 text-left flex items-start gap-2.5 hover:border-[#0078C1] hover:shadow-sm transition-all cursor-pointer disabled:opacity-50 group"
+                  title={`Sign in as ${account.name}`}
+                >
+                  <div className={`w-8 h-8 rounded-full ${account.avatarBg} flex items-center justify-center text-white text-[11px] font-black shrink-0`}>
+                    {account.initials}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-800 truncate leading-tight">{account.name}</p>
+                    <span className={`inline-block mt-1 px-1.5 py-0.5 rounded border text-[9px] font-bold tracking-wide ${account.roleBadge}`}>
+                      {account.role}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

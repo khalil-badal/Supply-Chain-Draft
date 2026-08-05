@@ -211,7 +211,7 @@ export default function RecordCreateForm({
     setForm(prev => ({ ...prev, company_name: name, company_id: company?.id || '' }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: Record<string, string> = {};
     if (!form.company_name.trim()) errors.company_name = 'Company Name is required';
@@ -229,7 +229,7 @@ export default function RecordCreateForm({
     let bannerLines: string[] = [];
 
     if (outputActionConfigs) {
-      const creationOutput = runOutputActions('Record Created', outputActionConfigs['Record Created'], { amName: form.account_manager });
+      const creationOutput = await runOutputActions('Record Created', outputActionConfigs['Record Created'], { amName: form.account_manager });
       outputActionLog = creationOutput.newEntries;
       bannerLines = creationOutput.banners.length > 0
         ? creationOutput.banners

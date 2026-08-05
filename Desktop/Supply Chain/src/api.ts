@@ -485,4 +485,11 @@ export const api = {
     request<ApiDriver>(`/drivers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteDriver: (id: string) =>
     request<void>(`/drivers/${id}`, { method: 'DELETE' }),
+
+  // Email notifications
+  sendNotificationEmail: (data: { recordId: string; trigger: string; recipients: string[] }) =>
+    request<{ ok: boolean; sent: number; failed: number }>('/notifications/send-email', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };

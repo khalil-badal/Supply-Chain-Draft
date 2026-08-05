@@ -750,7 +750,9 @@ function ActionsTab({
 
     const trigger = getOutputTrigger(record.category, newStatus);
     if (trigger) {
-      const result = runOutputActions(trigger, outputActionConfigs[trigger], { amName: record.account_manager, at: now });
+      const result = await runOutputActions(trigger, outputActionConfigs[trigger], {
+        amName: record.account_manager, at: now, recordId: record.id, api,
+      });
       updates.output_actions_log = [...result.newEntries, ...(record.output_actions_log ?? [])];
       updates.email_notification_sent = result.emailSent;
     }

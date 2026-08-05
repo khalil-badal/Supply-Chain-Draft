@@ -6,7 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import { prisma } from './db';
 import { notifyRole, notifyUser } from './services/inAppNotify';
-import { sendMailReal } from './services/mailer';
+import { sendMailReal, sendEmail } from './services/mailer';
 
 import authRoutes from './routes/auth';
 import recordsRoutes from './routes/records';
@@ -164,9 +164,8 @@ async function notify4PM() {
 
       if (amUser) {
         await notifyUser(amUser.id, title, message);
+        await sendEmail({ to: amUser.email, subject: title, text: message });
       }
-      // EMAIL HOOK: wire email delivery here when email transport is configured
-      // await sendEmail(amUser?.email ?? '', title, message);
 
       await prisma.notificationLog.create({
         data: {

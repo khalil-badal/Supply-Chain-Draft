@@ -14,14 +14,15 @@ datasource db {
 // values are documented in the comments below.
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      String // SALES_COORDINATOR | LOGISTICS | TASS | ADMIN
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  password     String
+  role         String // SALES_COORDINATOR | LOGISTICS | TASS | ADMIN
+  isActive     Boolean  @default(true)
+  microsoftOid String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   createdRecords  DeliveryRecord[] @relation("CreatedByUser")
   modifiedRecords DeliveryRecord[] @relation("ModifiedByUser")

@@ -28,10 +28,11 @@ export function signToken(user: AuthUser): string {
 }
 
 export function setSessionCookie(res: Response, token: string) {
+  const isProd = process.env.NODE_ENV === 'production';
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: false, // dev over http; flip to true behind HTTPS in production
+    sameSite: isProd ? 'none' : 'lax',
+    secure: isProd,
     maxAge: 8 * 60 * 60 * 1000
   });
 }

@@ -38,3 +38,23 @@ services:
         generateValue: true
       - key: PORT
         value: 10000
+      # Microsoft Azure AD SSO (set in Render dashboard)
+      - key: AZURE_CLIENT_ID
+        sync: false
+      - key: AZURE_CLIENT_SECRET
+        sync: false
+      - key: AZURE_TENANT_ID
+        sync: false
+      - key: APP_URL
+        sync: false
+      # SMTP fallback (if not using Graph API for email)
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false

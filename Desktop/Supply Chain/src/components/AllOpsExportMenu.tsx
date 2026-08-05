@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FileDown, FileSpreadsheet, FileText, ChevronDown, Loader2, Clock, History } from 'lucide-react';
 import { DeliveryRecord } from '../types';
 import { ExportMeta, StatusHistoryCounts } from '../utils/export';
@@ -66,7 +66,7 @@ export default function AllOpsExportMenu({ records, meta, activeFilterLabel, sta
     ? (() => { const [fmt] = loading.split('-') as [Format, Variant]; return fmt.toUpperCase(); })()
     : '';
 
-  const btn = (fmt: Format, label: string, icon: JSX.Element, color: string, variant: Variant) => (
+  const btn = (fmt: Format, label: string, icon: React.ReactNode, color: string, variant: Variant) => (
     <button
       key={`${fmt}-${variant}`}
       onClick={() => run(fmt, variant)}
