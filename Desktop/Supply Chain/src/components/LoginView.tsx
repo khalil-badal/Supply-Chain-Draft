@@ -171,8 +171,8 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
           </div>
 
           {/* Heading */}
-          <h2 className="text-2xl font-black text-[#1F3864] mb-1">Welcome back</h2>
-          <p className="text-sm text-slate-400 mb-7">Sign in to access the portal</p>
+          <h2 className="text-2xl font-black text-[#1F3864] mb-1 text-center">Welcome back</h2>
+          <p className="text-sm text-slate-400 mb-7 text-center">Sign in to access the portal</p>
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm font-semibold rounded-lg px-4 py-3 mb-4" id="login-error">
