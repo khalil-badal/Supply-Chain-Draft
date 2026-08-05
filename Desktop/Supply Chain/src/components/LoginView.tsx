@@ -148,8 +148,8 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
 
         {/* Logo + text */}
         <div className="relative z-10 flex flex-col items-center text-center">
-          <img src="/microgenesis_logo_white.png" alt="Microgenesis - Making IT Easy For You!" className="w-72" />
-          <h1 className="text-4xl font-black text-white tracking-tight leading-tight mt-8">
+          <img src="/microgenesis_logo_white.png" alt="Microgenesis - Making IT Easy For You!" className="w-[28rem]" />
+          <h1 className="text-5xl font-black text-white tracking-tight leading-tight mt-8">
             Supply Chain Portal
           </h1>
         </div>
