@@ -146,6 +146,34 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
         <div className="w-96 h-96 bg-white/5 rounded-full blur-3xl absolute -top-20 -right-20 pointer-events-none" />
         <div className="w-80 h-80 bg-[#0078C1]/20 rounded-full blur-3xl absolute -bottom-16 -left-16 pointer-events-none" />
 
+        {/* Flowing line texture */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 900 900" preserveAspectRatio="none">
+          <path d="M -50 160 C 200 90, 550 240, 950 110" stroke="white" strokeOpacity="0.08" strokeWidth="1.5" fill="none" />
+          <path d="M -50 320 C 250 270, 600 400, 950 280" stroke="white" strokeOpacity="0.06" strokeWidth="1.5" fill="none" />
+          <path d="M -50 600 C 220 540, 520 700, 950 580" stroke="white" strokeOpacity="0.05" strokeWidth="1" fill="none" />
+        </svg>
+
+        {/* Fading dot-matrix cluster, bottom-left */}
+        <svg className="absolute bottom-0 left-0 w-72 h-72 pointer-events-none" viewBox="0 0 280 280">
+          {Array.from({ length: 9 }).map((_, row) =>
+            Array.from({ length: 9 }).map((_, col) => {
+              const dist = Math.sqrt(row * row + col * col);
+              const opacity = Math.max(0, 0.45 - dist * 0.055);
+              if (opacity <= 0.02) return null;
+              return (
+                <circle
+                  key={`${row}-${col}`}
+                  cx={col * 32}
+                  cy={280 - row * 32}
+                  r={1.6}
+                  fill="white"
+                  fillOpacity={opacity}
+                />
+              );
+            })
+          )}
+        </svg>
+
         {/* Logo + text */}
         <div className="relative z-10 flex flex-col items-center text-center">
           <img src="/microgenesis_logo_white.png" alt="Microgenesis - Making IT Easy For You!" className="w-[28rem]" />
