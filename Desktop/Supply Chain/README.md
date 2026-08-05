@@ -2,7 +2,7 @@
 
 A full-stack replacement for **Microgenesis Business Systems'** internal Supply Chain System — previously a SharePoint List-based tracker.
 
-> **Status:** Full-stack application, deployed to Render as a single service (`render.yaml`). Delivery records, companies, customers, suppliers, drivers, users/auth, and the SKU Master all run on a real Express + Prisma + **PostgreSQL** backend (`server/`) with JWT-cookie login and server-enforced RBAC across **five roles** (Sales Coordinator, Logistics, TASS, Admin, and **Driver**) — see [Full-Stack Setup](#full-stack-setup) below.
+> **Status:** Full-stack application, deployed to Render as a single service (`render.yaml`). Delivery records, companies, customers, suppliers, drivers, users/auth, and the SKU Master all run on a real Express + Prisma + **PostgreSQL** backend (`server/`) with JWT-cookie login and server-enforced RBAC across **five roles** (Sales Coordinator, Logistics, TASS, Admin, and **Driver**) — see [Full-Stack Setup](#full-stack-setup) below. Login also supports **Microsoft Azure AD single sign-on** alongside email+password, real outbound email via **Microsoft Graph** (with SMTP/console-log fallbacks), and an optional **Microsoft Teams tab app** packaging — see [Authentication & Microsoft 365 Integration](#authentication--microsoft-365-integration).
 
 This document is written for two audiences at once: engineers who need to run, extend, or evaluate the codebase, and stakeholders who want to understand *why* the system is built the way it is and what it replaces. Wherever a feature is described, the intent is to answer not just "what does this do" but "what business problem does this solve, and for whom."
 
@@ -18,6 +18,8 @@ This document is written for two audiences at once: engineers who need to run, e
 - [System Architecture](#system-architecture)
 - [Features](#features)
 - [Roles & Permissions (RBAC)](#roles--permissions-rbac)
+- [Authentication & Microsoft 365 Integration](#authentication--microsoft-365-integration)
+- [Microsoft Teams Integration](#microsoft-teams-integration)
 - [Logistics Operations](#logistics-operations)
 - [Dashboard](#dashboard)
 - [Inventory](#inventory)
@@ -26,6 +28,7 @@ This document is written for two audiences at once: engineers who need to run, e
 - [Output Actions](#output-actions)
 - [Audit Logs](#audit-logs)
 - [Statistical Reports](#statistical-reports)
+- [Admin Panel](#admin-panel)
 - [Tech Stack](#tech-stack)
 - [Database Architecture](#database-architecture)
 - [Backend API](#backend-api)
@@ -67,6 +70,8 @@ Open `http://localhost:3000` and log in with one of the seeded accounts (also sh
 | admin@microgenesis.com | admin123 | Admin |
 
 > There is no seeded Driver account by default — an Admin creates Driver logins through **Admin Panel → Users** (or `POST /api/users`) once the app is running. See [Roles & Permissions](#roles--permissions-rbac) for what the Driver role sees.
+
+The **Sign in with Microsoft** button is always visible on the login screen — without `AZURE_CLIENT_ID`/`AZURE_CLIENT_SECRET` set, clicking it shows a clear error and expands the email-login form above, rather than failing silently. See [Authentication & Microsoft 365 Integration](#authentication--microsoft-365-integration) for the full SSO flow and how to configure it.
 
 See `server/src/index.ts` and `server/.env.example` for backend configuration details. Production runs on Render with a managed Postgres instance — see [Deployment](#deployment) and `render.yaml`.
 
@@ -113,13 +118,17 @@ This separation exists so that **authorization cannot be bypassed by talking to 
 - **SKU Master & Inventory** — `Product` / `InventoryItem` / `InventoryTransaction` tables track SKU code, category (A/B/C), unit cost/price, reorder point, warehouse bin location, on-hand/allocated quantity, and a full transaction ledger (`Goods Receipt`, `Sale`, `Adjustment`, `Transfer`) viewable in `TransactionCenter.tsx` / `TransactionDetail.tsx`. See [Inventory](#inventory).
 - **Linked collections** — an Accounting Collection record can be linked back to the delivery record(s) that generated it (`linkedCollectionId`, a self-relation on `DeliveryRecord`), so billing can be traced to the original fulfillment.
 - **Per-user granular permissions** — beyond each role's default screen set, an Admin can grant or revoke access to individual screens for a specific user (`UserPermission` table, managed from Admin Panel or `GET/PUT /api/users/:id/permissions`).
+- **Microsoft Azure AD single sign-on** — a "Sign in with Microsoft" button always visible on the login screen alongside email+password, backed by a real OAuth 2.0 authorization-code flow (`@azure/msal-node`), with auto-provisioning of new users and account linking via a `microsoftOid` field on `User`. See [Authentication & Microsoft 365 Integration](#authentication--microsoft-365-integration).
+- **Real outbound email** — a unified mailer (`server/src/services/mailer.ts`) that sends through **Microsoft Graph** when Azure credentials are configured, falls back to **SMTP**, and falls back again to a console-logged mock if neither is set — so the app behaves the same in every environment, just with a different delivery method. See [Authentication & Microsoft 365 Integration](#authentication--microsoft-365-integration).
+- **Microsoft Teams tab app packaging** — a Teams v1.17 app manifest, icons, and a build script (`teams/`) for embedding the portal as a Teams tab with SSO. See [Microsoft Teams Integration](#microsoft-teams-integration).
+- **Admin integration diagnostics** — an Admin Panel tab showing live Azure SSO / email-delivery configuration status, Microsoft-linked user counts, and a one-click test-email sender, so an Admin can verify integrations without reading server logs. See [Admin Panel](#admin-panel).
 - **In-app notifications** — a notification bell (`NotificationBell.tsx`) backed by a `Notification` table, plus a separate `NotificationLog` audit trail of trigger events (title/message, recipient, send status) distinct from the in-app bell. See [Notifications](#notifications).
-- **IPO-style configurable Output Actions** — six process-output trigger events, each with independently configurable output channels. See [Output Actions](#output-actions).
+- **IPO-style configurable Output Actions** — six process-output trigger events, each with independently configurable output channels, dispatching real outbound email through the unified mailer. See [Output Actions](#output-actions).
 - **CSV / Excel / PDF / Word export**, shared across record modules, with dedicated driver reports, route slips, and a cross-category "All Operations" export. See [Exporting System](#exporting-system).
 - **Reports** — `StatisticalReportView.tsx` and the `reports.ts` API surface trend data drawn from a `DailyStatusSnapshot` daily rollup table. See [Statistical Reports](#statistical-reports).
 - **Global Search** (`GlobalSearch.tsx`) — search across records from anywhere in the app.
 - **Data Sampler** (Admin only) — generates realistic demo records per module with human-readable `REC-XXXXX` IDs, plus a Reset control with two modes: **Full Reset** (wipes transactional data, keeps users/master data) or **Reset to Seed Data** (full wipe + re-seed, which logs everyone out).
-- **Admin Panel** — user management (list/create/deactivate/activate, per-user permission overrides) and a system-wide audit log viewer, gated to the `Admin` role both in the UI and on every backend route.
+- **Admin Panel** — user management (list/create/edit/deactivate/activate, per-user permission overrides, Microsoft-linked auth badge), a system-wide audit log viewer, and an Integrations tab (Azure SSO / email status, test email), gated to the `Admin` role both in the UI and on every backend route. See [Admin Panel](#admin-panel).
 - **No record-volume cap** — the dashboard shows a live record count with no artificial data-entry block, addressing the SharePoint list-threshold pain point directly.
 - **Deep-linkable flagged records** — the Dashboard's "Needs Attention" panel and the Dispatch Board's unassigned-driver list are clickable, jumping straight to the record's detail drawer regardless of category.
 - **Server-backed, reload-safe** — nearly all data (delivery records, companies, customers, suppliers, drivers, users, SKU/inventory) lives server-side in PostgreSQL; multiple browsers/users share the same data and see each other's changes on refresh.
@@ -133,6 +142,80 @@ RBAC exists because different departments have different responsibilities and di
 > **⚠️ TASS is provisional.** `TASS` = **Technical Admin System Services**, not Accounting or Finance. Its permissions below are this project's current best-guess implementation, made **before** a stakeholder meeting with the TASS department — treat them as unconfirmed and subject to change.
 
 **For the full permissions table (who can do what, screen by screen) and the TASS status tracker, see [`docs/ROLES.md`](./docs/ROLES.md).**
+
+## Authentication & Microsoft 365 Integration
+
+### Overview
+
+Login supports two paths side by side, both landing in the same session-cookie/RBAC system described above: **email + password** (the original path, still fully supported) and **Microsoft Azure AD single sign-on** via an OAuth 2.0 authorization-code flow. The "Sign in with Microsoft" button is always visible on the login screen — it does not depend on Azure being configured, and if it isn't, clicking it surfaces a clear inline error and expands the email form instead of silently failing or flickering.
+
+Once a user is authenticated by either path, outbound email (delivery notifications, the daily 4 PM logistics/AM alert, the weekly report, Output Action notifications) all flow through a single unified mailer with a three-tier fallback chain: **Microsoft Graph → SMTP → console-logged mock**. This means the exact same application code runs unmodified whether the deployment has full Microsoft 365 integration configured, only SMTP, or neither.
+
+### Why it Matters
+
+Microgenesis staff already have Microsoft 365 accounts for email and Teams; requiring a second, separate password for this portal is friction with no security benefit, and it means account lifecycle (a staff member leaving the company) has to be managed in two places instead of one. Real outbound email — as opposed to a mock console log — is what actually makes the Output Actions and daily alert system useful in production rather than just a demo of the UX.
+
+### Business Benefits
+
+- **Single sign-on convenience** — staff sign in with the Microsoft account they already use for Outlook/Teams; no separate password to remember or reset.
+- **Centralized account lifecycle** — deactivating a user's Microsoft 365 account is enough to keep them out day-to-day (their portal session still expires on its normal 8-hour JWT schedule); an Admin can also deactivate the linked portal account directly from the Admin Panel.
+- **Real notification delivery** — once Azure or SMTP credentials are configured, every Output Action email, the 4 PM logistics/AM reminder, and the weekly Logistics/Admin report are genuinely delivered, not just logged to a server console.
+- **Zero-downtime rollout** — because the mailer and login both silently fall back (SSO button still works for email login when Azure isn't configured; email falls back to SMTP, then to a mock), this can be deployed and tested before Azure credentials exist, and Azure can be added later without a code change.
+
+### How Sign-In Works
+
+1. User clicks **Sign in with Microsoft** on the login screen (`LoginView.tsx`).
+2. Frontend calls `POST /api/auth/microsoft`; if Azure isn't configured, the backend returns a `501` with a clear error, which the frontend shows inline and uses to expand the email-login form — the button itself never disappears.
+3. If configured, the backend builds an MSAL (`@azure/msal-node`) authorization URL and the browser is redirected to Microsoft's login page.
+4. Microsoft redirects back to `GET /api/auth/microsoft/callback` with an authorization code.
+5. The backend exchanges the code for an ID token, reads the `oid` (object ID), `email`, and `name` claims, and looks up an existing user — **preferring a `microsoftOid` match, falling back to an email match** — so a user who already had an email+password account before SSO was enabled gets linked to their Microsoft identity automatically on first SSO login rather than getting a duplicate account.
+6. If no matching user exists, one is auto-created with role `SALES_COORDINATOR`, a random (unusable, never surfaced) password, and `isActive: true`.
+7. If the matched or created user is deactivated, the callback redirects back to the login page with an `account_deactivated` error instead of issuing a session.
+8. A signed session JWT is set in the same `mg_session` httpOnly cookie used by email+password login — from this point on, SSO and email-login sessions are indistinguishable to every other part of the app.
+
+### Cookie Hardening for Teams/Iframe Contexts
+
+`setSessionCookie` (`server/src/middleware/auth.ts`) sets `secure: true` and `sameSite: 'none'` when `NODE_ENV=production`, and `sameSite: 'lax'` in local dev. This is specifically required for the portal to work when embedded in an iframe — such as a Microsoft Teams tab (see [Microsoft Teams Integration](#microsoft-teams-integration)) — since browsers block same-site-lax cookies in a cross-site iframe context.
+
+### Email Delivery Chain
+
+`server/src/services/mailer.ts` exposes a single `sendEmail({ to, subject, text, html? })` entry point used by every code path that sends outbound mail (the 4 PM/weekly scheduled jobs in `index.ts`, the Output Actions email endpoint in `notifications.ts`, the Accomplished-trigger notifier in `notify.ts`, and the Admin Panel's test-email button). It picks a delivery method automatically:
+
+1. **Microsoft Graph** — used when `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, and `AZURE_TENANT_ID` are all set. Authenticates via `@azure/identity`'s `ClientSecretCredential` and sends through the Graph API's `/users/{from}/sendMail`, requiring the Azure app registration to have `Mail.Send` application permission with admin consent.
+2. **SMTP** — used when Graph isn't configured but `SMTP_HOST` is set, via `nodemailer`.
+3. **Mock (console log)** — the default when neither is configured; the full email content is logged to the server console instead of sent, so the rest of the app behaves identically in an unconfigured environment.
+
+Every send returns a `{ ok, method, error? }` result, and callers that write to `NotificationLog` record the real outcome — `SENT` for Graph/SMTP, `MOCKED` only when the mailer genuinely fell back to console-only delivery, `FAILED` on error — so the audit trail never overstates what actually happened.
+
+### Admin Diagnostics
+
+`GET /api/admin/integration-status` (Admin only) reports whether Azure SSO is configured (and its tenant/redirect URI), which email method is currently active, and how many users are Microsoft-linked vs. email-only — surfaced in the Admin Panel's **Integrations** tab (see [Admin Panel](#admin-panel)). `POST /api/admin/test-email` sends a real test email through the same `sendEmail()` path and reports which method handled it, so an Admin can confirm end-to-end delivery without needing server console/log access.
+
+### Technical Highlights
+
+New users created via SSO get role `SALES_COORDINATOR` by default — the same default role a brand-new manually-created account would need explicitly assigned, keeping the auto-provisioning path's blast radius equivalent to the lowest-privilege manual path. The `User.microsoftOid` column is unique and nullable, so email-only accounts are entirely unaffected by SSO being enabled or disabled. `getMsalConfig()` (`server/src/routes/auth.ts`) is the single source of truth for whether Azure is "configured" — checked by the auth routes, the `/microsoft/status` endpoint, and the admin diagnostics endpoint — so there is exactly one place that decides whether SSO is available.
+
+## Microsoft Teams Integration
+
+### Overview
+
+The `teams/` directory packages the portal as a Microsoft Teams tab app: a manifest (`teams/manifest.json`), color/outline icons, a build script (`teams/build.sh`) that fills in deployment-specific placeholders and produces an upload-ready zip, and a step-by-step setup guide (`teams/README.md`) covering the Azure AD app registration required for Teams SSO.
+
+### Why it Matters
+
+Staff already live in Microsoft Teams throughout the day; a portal that's one more browser tab to remember to open is a portal that gets checked less often than one pinned directly in Teams. Packaging the app as a Teams tab, rather than asking IT to build a separate Teams integration from scratch, means the same Azure AD app registration used for browser SSO (see [Authentication & Microsoft 365 Integration](#authentication--microsoft-365-integration)) also powers the Teams tab's identity.
+
+### How It's Packaged
+
+The manifest defines both a **static personal tab** (pinned to a user's own Teams sidebar) and a **configurable tab** (added inside a Team or group chat), both pointing at the deployed portal URL with a `?teams=1` query flag. Three placeholders — `{{AZURE_CLIENT_ID}}`, `{{APP_URL}}`, `{{APP_DOMAIN}}` — must be resolved before the manifest can be uploaded; `teams/build.sh` handles this by reading the values from environment variables or a gitignored `teams/.env` file, writing a `manifest.filled.json` (the tracked `manifest.json` template is never modified), and zipping it together with both icons under the exact filename Teams requires (`manifest.json` inside the zip). The script prefers the standard `zip` CLI and falls back to PowerShell's `Compress-Archive` when `zip` isn't on `PATH` (e.g. some Windows Git Bash setups).
+
+### Setup
+
+**Full step-by-step instructions, including the Azure AD app registration (redirect URIs, API permissions, Application ID URI, authorized Teams client IDs), live in [`teams/README.md`](./teams/README.md).** In summary: register (or reuse) an Azure AD app, add the Teams-specific redirect URI and API exposure, set the same `AZURE_CLIENT_ID`/`AZURE_CLIENT_SECRET`/`AZURE_TENANT_ID`/`APP_URL` environment variables used for browser SSO (see [Environment Variables](#environment-variables)), run `teams/build.sh` to produce the zip, and upload it in **Teams Admin Center → Manage apps → Upload custom app**.
+
+### Technical Highlights
+
+Because the Teams tab and the browser login share one Azure AD app registration and one session-cookie mechanism, there is no separate "Teams identity" to keep in sync — a user's portal account, permissions, and audit trail are identical whether they open the portal in a browser tab or a Teams tab. The cookie hardening described in [Authentication & Microsoft 365 Integration](#authentication--microsoft-365-integration) exists specifically to make the Teams iframe embedding work; without `sameSite: 'none'; Secure`, the session cookie would be silently dropped inside the Teams client.
 
 ## Logistics Operations
 
@@ -271,7 +354,7 @@ The 3-row metadata header and footer total row are generated once in `export.ts`
 The portal has two distinct notification concepts, backed by two separate tables, and they should not be confused with each other:
 
 1. **In-app bell notifications** — the `Notification` model and `NotificationBell.tsx` UI. These are created by `services/inAppNotify.ts` (`notifyRole(role, ...)` to fan out to every active user of a role, or `notifyUser(userId, ...)` for a specific person), and consumed via `notifications.ts` routes (list, unread count, mark-read/read-all).
-2. **Outbound trigger audit** — the `NotificationLog` model, written by `services/notify.ts`'s `notifyAccomplished()` whenever a delivery record's status changes to Accomplished/Delivered. This is the one Output Action trigger wired to a real backend effect: it writes a `NotificationLog` row and sends a full mock email via Nodemailer (console-logged unless real SMTP credentials are configured).
+2. **Outbound trigger audit** — the `NotificationLog` model. Every Output Action trigger that resolves at least one recipient and has a `recordId` to attach to (see [Output Actions](#output-actions)) calls `POST /api/notifications/send-email`, which resolves recipients (Account Manager by name match, or every active Logistics/TASS user), sends through the unified mailer (see [Authentication & Microsoft 365 Integration](#authentication--microsoft-365-integration)), and writes one `NotificationLog` row per recipient with the real outcome (`SENT`/`FAILED`/`MOCKED`). The Accomplished trigger specifically is additionally covered by a dedicated `services/notify.ts::notifyAccomplished()` function, per the original spec.
 
 ### Why it Matters
 
@@ -281,8 +364,8 @@ Cross-department coordination in the old system depended on people remembering t
 
 - **Cross-department coordination** — role-targeted notifications (`notifyRole`) mean the right department is told about a relevant event without anyone having to manually loop them in.
 - **Operational awareness** — the unread-count badge on the bell gives an at-a-glance signal that something needs attention.
-- **Process automation** — the Accomplished trigger fires automatically the moment a delivery's status changes, with no manual step required to notify stakeholders that a delivery is complete.
-- **Event tracking** — `NotificationLog` retains a durable record of every triggered notification event and its delivery status (`SENT`/`FAILED`/`MOCKED`), independent of whether the in-app bell notification was ever read.
+- **Process automation** — status-change triggers (Accomplished, Rescheduled, On-Hold, RMA Completed, Collection Verified) fire automatically and dispatch real email through the unified mailer, with no manual step required to notify stakeholders.
+- **Event tracking** — `NotificationLog` retains a durable record of every triggered notification event and its actual delivery status (`SENT`/`FAILED`/`MOCKED`), independent of whether the in-app bell notification was ever read.
 
 ### Department Impact
 
@@ -290,7 +373,7 @@ Notifications are role-targeted rather than broadcast to everyone — Logistics,
 
 ### Technical Highlights
 
-The synthetic recipient address used by the mock email path is derived deterministically from the recipient's name (`name → lowercase, non-alphanumeric characters replaced with '.', @microgenesis.example`), which keeps the mock-email demo realistic without needing real addresses configured. A code comment in `services/notify.ts` explicitly warns against wiring additional automated triggers into that function outside of the Accomplished event, per the current spec — a deliberate scope boundary, not an oversight.
+`POST /api/notifications/send-email` resolves the `AM` recipient by a case-insensitive name match against the record's `accountManager` field, and `LOGISTICS`/`TASS` recipients as every currently-active user with that role — so a role recipient list always reflects who's actually active today, not a stale roster. A code comment in `services/notify.ts` explicitly warns against wiring additional automated triggers into `notifyAccomplished()` beyond the Accomplished event — the general-purpose send-email endpoint (used by the other status-change triggers) is the intended place for new trigger wiring, not that function.
 
 ## Output Actions
 
@@ -308,11 +391,13 @@ Output Actions formalize what used to be an informal, memory-dependent notificat
 
 ### Operational Workflow
 
-Only the **Accomplished** trigger is currently wired to a real backend effect: when a delivery record's status is set to Delivered/Accomplished, `services/notify.ts::notifyAccomplished()` writes a `NotificationLog` row and sends a mock email. The other five triggers (Record Created, Rescheduled, On-Hold, RMA Completed, Collection Verified) are client-side simulations — a visible confirmation banner and a persisted per-record log entry are produced, but no network call is made. This is a deliberate, documented scope boundary (see [Notifications](#notifications) Technical Highlights) rather than a bug: it demonstrates the intended UX and audit trail for all six triggers while limiting real automated side effects to the one event with the clearest, lowest-risk backend implementation.
+**Five of the six triggers dispatch real email** through `POST /api/notifications/send-email` (see [Notifications](#notifications)): **Accomplished, Rescheduled, On-Hold, RMA Completed, and Collection Verified** all fire from a context that already has the record's ID (`DeliveryRecordWorkspace.tsx`, `DriverView.tsx`), so `runOutputActions()` (`src/outputActions.ts`) calls the real endpoint with whichever recipients (AM/Logistics/TASS) are toggled on for that trigger, and the response's sent/failed counts are reflected in the confirmation banner. **Record Created** is the one remaining client-side simulation — it fires from `RecordCreateForm.tsx` *before* the record has been persisted and assigned an ID, so there is nothing yet to attach a `NotificationLog` row to; it still produces a visible confirmation banner and a persisted per-record log entry once the record is saved, just without a real network call. This is a deliberate consequence of where in the creation flow the trigger fires, not an arbitrary scope cut — see [Notifications](#notifications) Technical Highlights for the equivalent boundary in `notify.ts`.
+
+Every trigger's "Export to PDF" and "Internal Only" channels remain UI-only regardless of which trigger fires — internal-only suppresses all output as intended, and PDF export is represented as a confirmation/log entry rather than an automatic file generation.
 
 ### Technical Highlights
 
-Because `OutputActionsPanel.tsx` is a single reusable component embedded across the Deliveries, RMA, Procurement Pick-up, and Accounting Collection workspaces, extending real backend automation to another trigger event in the future means adding one more service function and wiring it into the relevant route handler — the UI and configuration model already support it.
+Because `OutputActionsPanel.tsx` is a single reusable component embedded across the Deliveries, RMA, Procurement Pick-up, and Accounting Collection workspaces, and `runOutputActions()` already accepts an optional `{ recordId, api }` context, wiring the Record Created trigger to a real send in the future is a matter of moving the call to after record creation succeeds (where an ID exists), not adding new plumbing.
 
 ## Audit Logs
 
@@ -372,6 +457,30 @@ Statistical Reports and Status History are visible to Logistics and Admin only, 
 
 `DailyStatusSnapshot` uses a special `category` value of `"ALL"` to store the combined cross-category daily total alongside per-category rows, avoiding a separate table or a client-side sum for the "all categories" view. The `@@unique([date, category, status])` constraint keeps the rollup idempotent per day.
 
+## Admin Panel
+
+### Overview
+
+`AdminPanel.tsx` is the Admin-only control surface for the system, with three tabs: **User Management**, **System Audit Log** (see [Audit Logs](#audit-logs)), and **Integrations**.
+
+- **User Management** — list every account with role, active status, and a Microsoft-linked auth badge (see [Authentication & Microsoft 365 Integration](#authentication--microsoft-365-integration)); create a new user; edit an existing user's name, email, or role inline (`PATCH /api/users/:id`); deactivate/reactivate an account; and manage per-user screen-permission overrides on top of the role default (`GET`/`PUT /api/users/:id/permissions`).
+- **System Audit Log** — a paginated, filterable view over the global `AuditLog` table (see [Audit Logs](#audit-logs)).
+- **Integrations** — live diagnostics for Azure AD SSO and email delivery (`GET /api/admin/integration-status`): whether Azure is configured and its tenant/redirect URI, which email method is currently active (Graph/SMTP/mock), how many users are Microsoft-linked, and the app's environment. A **Send Test Email** form (`POST /api/admin/test-email`) sends a real email through the same mailer used everywhere else and reports which method handled it and whether it succeeded.
+
+### Why it Matters
+
+Once Azure AD SSO and real email are in play, "is it actually working" becomes a question an Admin needs to answer without SSH access to server logs — especially across two deployments (a Render staging environment and eventual production). The Integrations tab exists specifically so that question has a UI answer.
+
+### Business Benefits
+
+- **Faster incident triage** — an Admin can immediately see whether an email-delivery complaint traces back to a misconfigured environment variable (method shows `mock`) versus a genuine delivery failure (a test email fails with a Graph/SMTP error).
+- **Safe verification before rollout** — a new deployment's email configuration can be confirmed with a real test send before relying on it for the daily 4 PM/weekly automated notifications.
+- **Clear account provenance** — the Microsoft-linked badge in User Management makes it immediately visible which accounts were auto-provisioned via SSO versus created manually by an Admin.
+
+### Technical Highlights
+
+The Integrations tab and the login page's SSO button independently call the same `getMsalConfig()`-backed "is Azure configured" check (via different endpoints — `/api/auth/microsoft/status` for the login page, `/api/admin/integration-status` for the Admin Panel), so the two surfaces can never disagree about whether SSO is live. `PATCH /api/users/:id` validates the `role` value against the same role list used at user-creation time, so an inline edit can't set a user into an invalid role.
+
 ## Tech Stack
 
 **Frontend:**
@@ -388,9 +497,14 @@ Statistical Reports and Status History are visible to Logistics and Admin only, 
 **Backend (`server/`):**
 - **Node.js + Express** + **TypeScript**
 - **Prisma** ORM with the **PostgreSQL** provider
-- **JWT** (`jsonwebtoken`) in an httpOnly cookie for auth, 8-hour session expiry
+- **JWT** (`jsonwebtoken`) in an httpOnly cookie for auth, 8-hour session expiry, `secure`/`sameSite: 'none'` in production for Teams/iframe compatibility
 - **bcryptjs** for password hashing
-- **Nodemailer** (console-logging stream transport by default — logs full email content to the server console instead of sending, until real SMTP credentials are added to `server/.env`)
+- **`@azure/msal-node`** — Microsoft Azure AD OAuth 2.0 authorization-code flow for SSO login
+- **`@azure/identity`** + **`@microsoft/microsoft-graph-client`** — Microsoft Graph API email delivery (`Mail.Send`)
+- **Nodemailer** — SMTP fallback when Graph isn't configured
+- Unified mailer (`services/mailer.ts`): Graph → SMTP → console-logged mock, in that priority order — see [Authentication & Microsoft 365 Integration](#authentication--microsoft-365-integration)
+
+**Microsoft Teams packaging (`teams/`):** a Teams v1.17 app manifest + icons + build script — no additional runtime dependency, since the Teams tab is just the same web app loaded in an iframe. See [Microsoft Teams Integration](#microsoft-teams-integration).
 
 **Deployment:** Render, one web service serving the built Vite frontend + Express API from a single Node process, backed by a managed Render PostgreSQL database (see [Deployment](#deployment) and `render.yaml`).
 
@@ -416,7 +530,7 @@ PostgreSQL via Prisma (`server/prisma/schema.prisma`). Enum-like fields (role, s
 
 | Model | Purpose |
 |---|---|
-| `User` | Login accounts: name, email, hashed password, `role`, `isActive`. Relations to created/modified records, audit entries, notifications, comments, permissions, remark logs. |
+| `User` | Login accounts: name, email, hashed password, `role`, `isActive`, `microsoftOid` (unique, nullable — set when the account is linked to a Microsoft identity via SSO). Relations to created/modified records, audit entries, notifications, comments, permissions, remark logs. |
 | `UserPermission` | Per-user, per-screen access override (`screen`, `granted`), layered on top of the role default. |
 | `Company` | The validated Company/SAP lookup (`sapNumber`, address, contact person) that `DeliveryRecord.companyId` references. |
 | `Customer` | Merchant/customer directory — a relationship-management directory, intentionally **not** foreign-keyed to `DeliveryRecord`. |
@@ -443,19 +557,19 @@ The API is organized by business domain, not as a generic CRUD-for-everything la
 
 | Route file | Endpoints |
 |---|---|
-| `auth.ts` | `POST /login`, `POST /logout`, `GET /me` |
+| `auth.ts` | `POST /login`, `POST /logout`, `GET /me`, `POST /microsoft` (returns Azure AD auth URL, or `501` if unconfigured), `GET /microsoft/callback` (OAuth redirect target), `GET /microsoft/status` (no auth — `{ configured: boolean }`, used by the login page) |
 | `records.ts` | `GET /`, `GET /status-history-counts`, `GET /:id`, `GET /:id/audit`, `GET /:id/remarks`, `GET/POST /:id/comments`, `POST /` (Sales Coordinator, Logistics), `PUT /:id` (Sales Coordinator, Logistics, Admin, Driver, TASS), `PATCH /:id/status` (same 5 roles), `PATCH /:id/verify-collection` (TASS only), `DELETE /:id` (Sales Coordinator only) |
 | `companies.ts` | `GET /` (any authed user), `POST /` (Sales Coordinator only) |
 | `customers.ts` | `GET /` (any authed), `POST /` (Sales Coordinator, Logistics, Admin, Driver) |
 | `suppliers.ts` | `GET /` (any authed), `POST /` (Sales Coordinator, Logistics, Admin, Driver) |
 | `drivers.ts` | `GET /` (any authed), `POST`/`PUT`/`DELETE` (Logistics, Admin) |
-| `users.ts` | `GET /`, `POST /`, `PATCH /:id/deactivate`, `PATCH /:id/activate`, `GET/PUT /:id/permissions` — all Admin only |
+| `users.ts` | `GET /`, `POST /`, `PATCH /:id` (edit name/email/role), `PATCH /:id/deactivate`, `PATCH /:id/activate`, `GET/PUT /:id/permissions` — all Admin only |
 | `skus.ts` | `GET /`, `GET /:id`, `GET /:id/audit` (Admin), `POST /` (Admin), `PUT /:id` (Admin), `POST /:id/adjust` (Admin, Logistics) |
 | `transactions.ts` | `GET /`, `GET /:source/:id` |
 | `dashboard.ts` | `GET /stats` — role-discriminated KPI payload |
 | `reports.ts` | `GET /daily-status-history`, `GET /summary` (Logistics, Admin) |
-| `notifications.ts` | `GET /`, `GET /unread-count`, `PATCH /read-all`, `PATCH /:id/read` |
-| `admin.ts` | `GET /audit-log` (Admin only) |
+| `notifications.ts` | `GET /`, `GET /unread-count`, `PATCH /read-all`, `PATCH /:id/read`, `POST /send-email` (dispatches a real Output Action email and writes `NotificationLog`) |
+| `admin.ts` | `GET /audit-log`, `GET /integration-status` (Azure/email/user diagnostics), `POST /test-email` — all Admin only |
 | `data-sampler.ts` | `GET /counts`, `POST /generate`, `POST /reset` — all Admin only |
 | `dev.ts` | `POST /reset-seed` — no auth required; dev/demo convenience only, truncates and re-seeds the database |
 
@@ -515,12 +629,18 @@ server/
     ├── index.ts                # Express app entrypoint (serves API + built frontend in production)
     ├── db.ts                   # Prisma client
     ├── mappings.ts              # DB value <-> frontend display-string mapping, serializeRecord()
-    ├── middleware/auth.ts       # JWT cookie auth + requireAuth/requireRole RBAC middleware
+    ├── middleware/auth.ts       # JWT cookie auth + requireAuth/requireRole RBAC + production cookie hardening (secure/sameSite=none)
     ├── services/audit.ts        # Central AuditLog writer
-    ├── services/notify.ts       # The ACCOMPLISHED trigger (writes NotificationLog + sends mock email)
+    ├── services/notify.ts       # The dedicated ACCOMPLISHED trigger (writes NotificationLog + sends real email via the mailer)
     ├── services/inAppNotify.ts  # Writes in-app Notification rows
-    ├── services/mailer.ts       # Nodemailer console-logging transport (swap in real SMTP via .env)
-    └── routes/                  # See Backend API above
+    ├── services/mailer.ts       # Unified mailer: Microsoft Graph -> SMTP -> console-logged mock
+    └── routes/                  # See Backend API above (auth.ts includes Azure AD SSO routes)
+
+teams/
+├── manifest.json              # Teams v1.17 app manifest template (placeholders resolved by build.sh, never edited directly)
+├── build.sh                   # Fills placeholders from env/`.env`, packages microgenesis-teams-app.zip
+├── icon-color.png / icon-outline.png  # Teams app gallery + sidebar icons
+└── README.md                  # Azure AD app registration + Teams upload walkthrough
 ```
 
 ## Getting Started
@@ -569,15 +689,20 @@ npm run lint                # type-check with tsc --noEmit
 | `JWT_SECRET` | Long random string used to sign session JWTs |
 | `PORT` | Backend port (defaults to `4000`) |
 | `CLIENT_ORIGIN` | Allowed CORS origin for the frontend in dev (e.g. `http://localhost:3000`) |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Optional real SMTP credentials — leave blank to keep the console-logging mock mailer (`server/src/services/mailer.ts`) |
+| `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` | Azure AD app registration credentials — leave both blank to disable Microsoft SSO entirely (email+password login still works; the SSO button shows a clear error instead of failing silently) |
+| `AZURE_TENANT_ID` | Azure AD tenant ID (defaults to `common`); also required alongside the two above for the mailer to use Microsoft Graph for email |
+| `APP_URL` | This deployment's own base URL, e.g. `https://portal.microgenesis.com` — used to build the Azure AD redirect URI (`{APP_URL}/api/auth/microsoft/callback`) and must exactly match a redirect URI registered in Azure. **Do not confuse with the root `.env.example`'s `APP_URL`** (see below) — this is the real one. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | SMTP credentials, used as the email fallback when Graph isn't configured — leave blank to keep the console-logging mock mailer (`server/src/services/mailer.ts`) |
 
-**Root `.env`** — `GEMINI_API_KEY` / `APP_URL` in the root `.env.example` are unused AI Studio scaffold leftovers; no current feature reads them.
+See [`teams/README.md`](./teams/README.md) for the Azure AD app registration walkthrough (redirect URIs, API permissions, Teams-specific configuration) that produces the `AZURE_*` values above.
+
+**Root `.env`** — `GEMINI_API_KEY` / `APP_URL` in the root `.env.example` are unused AI Studio scaffold leftovers from before this project existed; no current feature reads them. This is a different, unrelated `APP_URL` from the one in `server/.env` described above — only the one in `server/.env` matters for Azure AD SSO.
 
 ## Data & Persistence
 
 Delivery records, companies, customers, suppliers, drivers, users/auth, notifications, audit logs, and the SKU Master (Products/Inventory/Transactions) all live in a real PostgreSQL database via Prisma, served by the Express backend. Multiple browsers/users share the same server-side data and see each other's changes on refresh.
 
-- "Notifying Logistics/TASS" and "exporting to PDF" via the Output Actions panel are a client-side simulation for 5 of the 6 IPO trigger events — they produce a visible confirmation banner and a persisted log entry, not a real network call. The one exception is the **Accomplished** trigger: changing a delivery record's status to Delivered calls the real backend, which writes a `NotificationLog` row and logs a full mock email to the server console (swap in real SMTP via `server/.env` to send for real). The **real** PDF/CSV/Excel/Word export menus are genuine client-side file generators, not simulations.
+- "Notifying AM/Logistics/TASS" via the Output Actions panel is a **real network call** for 5 of the 6 IPO trigger events (Accomplished, Rescheduled, On-Hold, RMA Completed, Collection Verified) — each calls `POST /api/notifications/send-email`, which sends through the unified mailer (Graph/SMTP/mock, see [Authentication & Microsoft 365 Integration](#authentication--microsoft-365-integration)) and writes a `NotificationLog` row per recipient. **Record Created** remains a client-side simulation, since it fires before the record has an ID to attach a log entry to — it still produces a visible confirmation banner and a persisted per-record log entry. "Export to PDF" as an Output Action channel is always a confirmation/log entry, not an automatic file generation — the **real** PDF/CSV/Excel/Word export menus elsewhere in the app are genuine client-side file generators, not simulations.
 - The header's "Reset Demo Data" action calls `POST /api/dev/reset-seed`, which truncates and re-seeds the database, then refetches. The Admin-only **Data Sampler** offers finer-grained control: **Full Reset** (deletes transactional records/audit/comments/notifications, keeps users & master data) or **Reset to Seed Data** (complete wipe + re-seed via `server/prisma/seed.ts`, which also recreates user accounts — this logs everyone out).
 - **Record IDs** are always the human-readable `REC-XXXXX` format, not raw Prisma cuids — generated per-source with disjoint ranges to avoid collisions: seed data uses `4001`–`4999`, records created through the normal Operations-tab forms use `10000`–`49999`, and the Admin Data Sampler uses `50000`–`99999`.
 - Document Attachments store only the file name (`documentAttachment` column) — no file bytes are uploaded or stored.
@@ -591,8 +716,11 @@ Deployed on **Render** as a single Blueprint (`render.yaml`) with two resources:
   - **Builds** the frontend and backend in one pass: `npm install --include=dev && npm run build && cd server && npm install --include=dev && npx prisma generate && npm run build`
   - **Starts** by applying migrations, seeding, then serving both the API and the built frontend from one Express process: `cd server && npx prisma migrate deploy && npx tsx prisma/seed.ts && cd .. && node server/dist/src/index.js`
   - Gets `DATABASE_URL` from the linked database and an auto-generated `JWT_SECRET`; `NODE_ENV=production`, `PORT=10000`.
+  - Declares placeholders (`sync: false`) for `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`, `APP_URL`, and `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`/`SMTP_FROM` — Render will prompt for these values in its dashboard rather than committing them to the repo; leaving them blank keeps Microsoft SSO disabled and email on the console-logged mock, so the Blueprint deploys and runs correctly with zero of them filled in.
 
 > Note: the current start command re-runs `prisma/seed.ts` on every deploy/restart, not only on first deploy. This is a deliberate convenience for a demo/evaluation deployment (it guarantees a known-good demo dataset after every deploy), but it is worth flagging explicitly for anyone adapting this Blueprint toward a true production deployment with real, non-seed transactional data, since a redeploy would re-run the seed script against live data.
+
+> **Running Render alongside a separate production deployment:** there is no conflict in keeping Render as a staging/QA environment after the company stands up its own production hosting — they're independent deployments of the same repository. The one thing that needs updating in both places is the Azure AD app registration's **redirect URIs** (Authentication blade): add one entry per environment (e.g. `https://your-app.onrender.com/api/auth/microsoft/callback` for Render, `https://portal.microgenesis.com/api/auth/microsoft/callback` for production) and remove Render's once it's decommissioned.
 
 ## Known Limitations
 
@@ -602,7 +730,8 @@ Deployed on **Render** as a single Blueprint (`render.yaml`) with two resources:
 - **Sales Coordinator has no dispatch actions**: by design, Sales Coordinator can create and fully edit a record but cannot assign a driver or change status — enforcing a segregation-of-duties (SoD) split between record creation and dispatch execution. Logistics is the primary role with "Assign Driver" / "Schedule" actions.
 - **Warehouses module is retired**: `WarehousesView.tsx` / `WarehouseWorkspace.tsx` still exist in the codebase but the `warehouses` screen is force-excluded from every role's effective screen set in `App.tsx` (including stale per-user permission grants), so it is not reachable from the UI.
 - **Document Attachments are filename-only** — no file bytes are uploaded or stored anywhere.
-- **Five of six Output Action triggers are simulated**, not wired to real email/notification delivery — see [Data & Persistence](#data--persistence) for the one exception (Accomplished).
-- **SMTP is mocked by default** — real email requires setting `SMTP_*` variables in `server/.env`; until then, all "sent" email is logged to the server console only.
+- **Record Created is the one Output Action trigger not wired to real email** — it fires before the record is persisted and has an ID, so it remains a client-side confirmation/log entry only; the other five triggers (Accomplished, Rescheduled, On-Hold, RMA Completed, Collection Verified) dispatch real email. See [Output Actions](#output-actions).
+- **Email defaults to a console-logged mock** — real delivery requires configuring either Microsoft Graph (`AZURE_CLIENT_ID`/`AZURE_CLIENT_SECRET`/`AZURE_TENANT_ID`) or SMTP (`SMTP_*`) variables in `server/.env`; with neither set, all "sent" email is logged to the server console only, and the Admin Panel's Integrations tab will show the active method as `mock`.
+- **Microsoft SSO auto-provisions new users as Sales Coordinator** — a first-time Microsoft sign-in with no matching existing account creates a new user with the lowest-privilege role by default; an Admin must manually promote them if a different role is needed.
 - **Inventory is single-location per SKU** — `InventoryItem` models one `warehouseLocation` per `Product` (a strict 1:1 relationship), not a multi-warehouse allocation model; the retired Warehouses module suggests multi-location support was explored but not carried into the current data model.
 - **Seed data is re-applied on every Render deploy** — see the note under [Deployment](#deployment).
