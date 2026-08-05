@@ -65,14 +65,6 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
   const [loading, setLoading] = useState(false);
   const [ssoLoading, setSsoLoading] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
-  const [ssoConfigured, setSsoConfigured] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    fetch('/api/auth/microsoft/status', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : { configured: false })
-      .then(data => setSsoConfigured(data.configured))
-      .catch(() => setSsoConfigured(false));
-  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -163,21 +155,19 @@ export default function LoginView({ onLoggedIn }: LoginViewProps) {
         )}
 
         {/* Microsoft SSO button */}
-        {ssoConfigured !== false && (
-          <button
-            onClick={handleMicrosoftLogin}
-            disabled={isLoading}
-            className="w-full bg-white hover:bg-slate-50 border border-[#8C8C8C] text-[#2F2F2F] font-semibold text-sm py-2.5 rounded-lg flex items-center justify-center gap-3 transition-all cursor-pointer disabled:opacity-60 shadow-sm mb-3"
-            id="microsoft-login-btn"
-          >
-            {ssoLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-            ) : (
-              <MicrosoftLogo />
-            )}
-            {ssoLoading ? 'Redirecting to Microsoft…' : 'Sign in with Microsoft'}
-          </button>
-        )}
+        <button
+          onClick={handleMicrosoftLogin}
+          disabled={isLoading}
+          className="w-full bg-white hover:bg-slate-50 border border-[#8C8C8C] text-[#2F2F2F] font-semibold text-sm py-2.5 rounded-lg flex items-center justify-center gap-3 transition-all cursor-pointer disabled:opacity-60 shadow-sm mb-3"
+          id="microsoft-login-btn"
+        >
+          {ssoLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+          ) : (
+            <MicrosoftLogo />
+          )}
+          {ssoLoading ? 'Redirecting to Microsoft…' : 'Sign in with Microsoft'}
+        </button>
 
         {/* Toggle for email login */}
         {!showEmailForm && (
